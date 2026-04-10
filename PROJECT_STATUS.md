@@ -1,6 +1,6 @@
 # PROJECT STATUS — Monopoly Deal Online
 
-> **Last updated:** Sprint 2 in progress
+> **Last updated:** Sprint 2 complete (2026-04-10)
 > **Repo:** github.com/TreyMangat/monopoly-deal-online
 > **Owner:** Trey
 
@@ -48,11 +48,11 @@ CLAUDE.md                  — Claude Code project context
 - [x] E2E test script (scripts/test-connection.ts)
 - [x] CLAUDE.md for Claude Code context
 
-### Sprint 2 🔄 (in progress)
-- [ ] Browser test client (public/index.html) — full playable game in browser
-- [ ] Server hardening — turn timers, disconnect handling, rate limiting
-- [ ] Engine edge cases — reshuffle, payment wilds, house/hotel teardown
-- [ ] Deploy to Railway
+### Sprint 2 ✅
+- [x] Browser test client (public/index.html) — full playable game in browser
+- [x] Server hardening — turn timers, disconnect handling, rate limiting
+- [x] Engine edge cases — reshuffle, payment wilds, house/hotel teardown
+- [x] Deploy to Railway
 
 ### Sprint 3 (planned) — iOS Client
 - [ ] Xcode project setup (SwiftUI)

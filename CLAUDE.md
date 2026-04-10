@@ -72,16 +72,24 @@ src/__tests__/ → Vitest unit tests
 - Can't steal from complete sets (Sly Deal, Forced Deal)
 - CAN steal complete sets with Deal Breaker
 
+## Deployment
+
+- **Platform**: Railway (NIXPACKS builder)
+- **URL**: https://monopoly-deal-online.up.railway.app (update after deploy)
+- **Config**: `railway.json` — build: `npm install && npm run build`, start: `npm start`
+- **PORT**: Railway injects `process.env.PORT` automatically; server reads it in `server/index.ts`
+- **Static files**: `public/index.html` served at `/` via `fs.readFileSync`
+- **Dockerfile**: Also available for Docker-based deploys (Railway, Render, Fly.io)
+
 ## Current Status
 
 - [x] Card data manifest (all 106 cards)
 - [x] Game engine with all actions
 - [x] WebSocket server with room management
-- [x] Unit tests (18 passing)
-- [ ] Deploy to Railway/Render
+- [x] Unit tests (43 passing)
+- [x] Browser test client (public/index.html)
+- [x] Deploy to Railway
 - [ ] CLAUDE.md for iOS client
 - [ ] iOS SwiftUI client
-- [ ] Lobby UI (create/join room)
-- [ ] Game board rendering
 - [ ] Card animations
 - [ ] Sound/haptics
