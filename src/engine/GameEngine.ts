@@ -48,6 +48,7 @@ import {
   canPayAnything,
   findCardInProperties,
   isActionCard,
+  isPropertyCard,
 } from "./helpers";
 
 // ---- Result Type ----
@@ -246,10 +247,8 @@ function playPropertyCard(
     if (destColor !== card.color) {
       return { ok: false, error: "Property card must go to its own color" };
     }
-  } else if (
-    card.type === CardType.PropertyWild ||
-    card.type === CardType.PropertyWildAll
-  ) {
+  } else if (card.type === CardType.PropertyWild) {
+    // 2-color wild cards can be played freely to either of their two colors
     if (!action.destinationColor) {
       return { ok: false, error: "Must specify destination color for wild card" };
     }
@@ -257,14 +256,20 @@ function playPropertyCard(
     if (!canCardGoToColor(card, destColor)) {
       return { ok: false, error: "Wild card cannot be placed on that color" };
     }
-    // Wild cards can only be placed on a color the player already has properties in
-    // Exception: if the player has NO properties at all, allow any valid color
+  } else if (card.type === CardType.PropertyWildAll) {
+    // Rainbow wild can only be placed on a color where the player already has properties
+    // If the player has NO properties at all, the card cannot be played as a property
+    if (!action.destinationColor) {
+      return { ok: false, error: "Must specify destination color for wild card" };
+    }
+    destColor = action.destinationColor;
     const hasAnyProperties = player.properties.some((g) => g.cards.length > 0);
-    if (hasAnyProperties) {
-      const existingGroup = player.properties.find((g) => g.color === destColor && g.cards.length > 0);
-      if (!existingGroup) {
-        return { ok: false, error: "Wild card can only be placed on a color you already have properties in" };
-      }
+    if (!hasAnyProperties) {
+      return { ok: false, error: "Rainbow wild cannot be played until you have at least one property" };
+    }
+    const existingGroup = player.properties.find((g) => g.color === destColor && g.cards.length > 0);
+    if (!existingGroup) {
+      return { ok: false, error: "Rainbow wild can only be placed on a color you already have properties in" };
     }
   } else {
     return { ok: false, error: "Card is not a property card" };
@@ -825,6 +830,18 @@ function handleDiscard(
       ok: false,
       error: `Must discard exactly ${excess} card(s), got ${action.cardIds.length}`,
     };
+  }
+
+  // Property cards cannot be discarded unless there aren't enough non-property cards
+  const nonPropertyCount = player.hand.filter((c) => !isPropertyCard(c)).length;
+  const mustDiscardProperties = nonPropertyCount < excess;
+  if (!mustDiscardProperties) {
+    for (const cardId of action.cardIds) {
+      const card = player.hand.find((c) => c.id === cardId);
+      if (card && isPropertyCard(card)) {
+        return { ok: false, error: "Cannot discard property cards when you have enough non-property cards to discard" };
+      }
+    }
   }
 
   for (const cardId of action.cardIds) {
