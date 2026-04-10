@@ -257,6 +257,15 @@ function playPropertyCard(
     if (!canCardGoToColor(card, destColor)) {
       return { ok: false, error: "Wild card cannot be placed on that color" };
     }
+    // Wild cards can only be placed on a color the player already has properties in
+    // Exception: if the player has NO properties at all, allow any valid color
+    const hasAnyProperties = player.properties.some((g) => g.cards.length > 0);
+    if (hasAnyProperties) {
+      const existingGroup = player.properties.find((g) => g.color === destColor && g.cards.length > 0);
+      if (!existingGroup) {
+        return { ok: false, error: "Wild card can only be placed on a color you already have properties in" };
+      }
+    }
   } else {
     return { ok: false, error: "Card is not a property card" };
   }
@@ -764,9 +773,6 @@ function moveWildCard(
   ) {
     return { ok: false, error: "Only wild cards can be moved between colors" };
   }
-  if (isSetComplete(group)) {
-    return { ok: false, error: "Cannot move a card from a complete set" };
-  }
   if (!canCardGoToColor(card, action.destinationColor)) {
     return { ok: false, error: "Wild card cannot go to that color" };
   }
@@ -778,8 +784,11 @@ function moveWildCard(
   const destGroup = getOrCreatePropertyGroup(player, action.destinationColor);
   destGroup.cards.push(card);
 
-  // Moving wilds does NOT consume a play (debated, but most common ruling)
+  // Moving a wild card costs 1 action
+  consumePlay(state);
+
   const desc = `${player.name} moved ${card.name} to ${action.destinationColor}`;
+  checkAutoEndTurn(state);
 
   return { ok: true, state, description: desc };
 }
@@ -914,6 +923,14 @@ function handlePayment(
   const paidCards: Card[] = [];
 
   for (const cardId of action.cardIds) {
+    // PropertyWildAll cards ($0 value) cannot be used as payment
+    const checkBank = player.bank.find((c) => c.id === cardId);
+    const checkProp = !checkBank ? findCardInProperties(player, cardId) : undefined;
+    const checkCard = checkBank || (checkProp ? checkProp.card : undefined);
+    if (checkCard && checkCard.type === CardType.PropertyWildAll) {
+      return { ok: false, error: "Wild Property (rainbow) cards cannot be used as payment" };
+    }
+
     let card = removeCardFromBank(player, cardId);
     if (!card) {
       card = removeCardFromProperties(player, cardId);

@@ -685,7 +685,7 @@ describe("Wild Card Color on Payment", () => {
     expect(dbGroup!.cards.some((c) => c.id === wildCard.id)).toBe(true);
   });
 
-  it("should place rainbow wild in receiver's bank (not properties)", () => {
+  it("should reject rainbow wild as payment ($0 value, cannot be taken)", () => {
     let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
@@ -739,23 +739,31 @@ describe("Wild Card Color on Payment", () => {
     expect(r1.ok).toBe(true);
     if (!r1.ok) return;
 
-    // p2 pays with the rainbow wild + money
+    // p2 tries to pay with the rainbow wild + money — rainbow wild should be rejected
     const r2 = applyAction(r1.state, {
       type: ActionType.PayWithCards,
       playerId: "p2",
       cardIds: [rainbowWild.id, moneyCard.id],
     });
-    expect(r2.ok).toBe(true);
-    if (!r2.ok) return;
+    expect(r2.ok).toBe(false);
+    if (r2.ok) return;
+    expect(r2.error).toContain("rainbow");
 
-    // Rainbow wild should go to p1's BANK, not properties
-    const p1After = r2.state.players[0];
-    expect(p1After.bank.some((c) => c.id === rainbowWild.id)).toBe(true);
-    // Should NOT be in any property group
-    const inProperties = p1After.properties.some((g) =>
+    // p2 pays with just money instead
+    const r3 = applyAction(r1.state, {
+      type: ActionType.PayWithCards,
+      playerId: "p2",
+      cardIds: [moneyCard.id],
+    });
+    expect(r3.ok).toBe(true);
+    if (!r3.ok) return;
+
+    // Rainbow wild should still be in p2's properties, not transferred
+    const p2After = r3.state.players[1];
+    const wildInP2Props = p2After.properties.some((g) =>
       g.cards.some((c) => c.id === rainbowWild.id)
     );
-    expect(inProperties).toBe(false);
+    expect(wildInP2Props).toBe(true);
   });
 });
 

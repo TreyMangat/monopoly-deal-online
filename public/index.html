@@ -360,6 +360,10 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   line-height:1.1;padding:1px;overflow:hidden;max-height:36px}
 .prop-group .pg-bonus{font-size:10px;color:var(--warn);margin-left:8px;display:flex;align-items:center;gap:2px}
 .prop-group .pg-bonus-icon{font-size:14px}
+.prop-group .pg-card-wild{cursor:pointer;position:relative}
+.prop-group .pg-card-wild .wild-rotate-icon{position:absolute;bottom:-1px;right:-1px;font-size:10px;
+  background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:14px;height:14px;
+  display:flex;align-items:center;justify-content:center;line-height:1}
 
 /* Bank */
 .bank-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -489,6 +493,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .hand-card.card-rent .rent-banner{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
   background:rgba(255,255,255,.15);padding:2px 0;text-align:center;font-size:10px;font-weight:800;
   letter-spacing:2px;color:#fff;backdrop-filter:blur(2px);pointer-events:none}
+.hand-card.card-rent .rent-footer-colors{background:linear-gradient(90deg, var(--color1) 50%, var(--color2) 50%)}
 
 /* NEW badge on freshly drawn cards */
 .hand-card .new-badge{position:absolute;top:-2px;left:-2px;background:var(--gold-bright);color:#1a1a1a;
@@ -2038,7 +2043,10 @@ function renderMyProperties() {
 
     let cardsHtml = '<div class="pg-cards">';
     g.cards.forEach((c, ci) => {
-      cardsHtml += `<div class="pg-card-mini" style="background:${bgColor};z-index:${ci}" title="${esc(c.name)}"><div class="mini-name">${esc(c.name.split(' ').map(w=>w[0]).join(''))}</div></div>`;
+      const isWild = c.type === 'property_wild' || c.type === 'property_wild_all';
+      const wildClass = isWild ? ' pg-card-wild' : '';
+      const wildClick = isWild ? ` onclick="onPropertyWildClick('${c.id}','${g.color}')"` : '';
+      cardsHtml += `<div class="pg-card-mini${wildClass}" style="background:${bgColor};z-index:${ci}"${wildClick} title="${esc(c.name)}"><div class="mini-name">${esc(c.name.split(' ').map(w=>w[0]).join(''))}</div>${isWild ? '<div class="wild-rotate-icon">&#8635;</div>' : ''}</div>`;
     });
     cardsHtml += '</div>';
 
@@ -2127,6 +2135,28 @@ function getCardClass(card) {
   return 'card-action';
 }
 
+// Calculate the best rent charge for a rent card based on player's properties
+function getRentChargeForCard(card) {
+  if (!gameState) return null;
+  const me = gameState.you;
+  if (!me || !me.properties) return null;
+  let colors = [];
+  if (card.type === 'rent_two_color' && card.rentColors) colors = card.rentColors;
+  else if (card.type === 'rent_wild') colors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  let best = 0;
+  colors.forEach(c => {
+    const g = me.properties.find(pg => pg.color === c);
+    if (g && g.cards.length > 0) {
+      const tier = RENT_TABLE[c];
+      if (tier) {
+        const idx = Math.min(g.cards.length - 1, tier.length - 1);
+        best = Math.max(best, tier[idx]);
+      }
+    }
+  });
+  return best > 0 ? best : null;
+}
+
 function buildCardHTML(card) {
   const t = card.type;
 
@@ -2190,30 +2220,33 @@ function buildCardHTML(card) {
   if (t === 'rent_two_color' && card.rentColors) {
     const c1 = COLOR_HEX[card.rentColors[0]] || '#666';
     const c2 = COLOR_HEX[card.rentColors[1]] || '#666';
+    const colorNames = card.rentColors.map(c => COLOR_LABELS[c]).join(' / ');
+    const rentCharge = getRentChargeForCard(card);
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
-      <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2};font-weight:800">&#128176; RENT</div>
+      <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2};font-weight:800">${colorNames}</div>
       <div class="rent-watermark">RENT</div>
       <div class="rent-banner">RENT</div>
       <div class="hc-body" style="position:relative;z-index:1">
         <div style="font-size:16px">&#128176;</div>
-        <div class="hc-name">${esc(card.name)}</div>
-        <div class="hc-desc">${card.rentColors.map(c => COLOR_LABELS[c]).join(' / ')}</div>
+        <div class="hc-name">Rent</div>
+        ${rentCharge ? `<div class="hc-desc">Charge: $${rentCharge}M</div>` : ''}
       </div>
-      <div class="hc-footer">Rent Card</div>
+      <div class="hc-footer rent-footer-colors" style="--color1:${c1};--color2:${c2}">Rent Card</div>
     `;
   }
 
   if (t === 'rent_wild') {
+    const rentCharge = getRentChargeForCard(card);
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
-      <div class="hc-color-bar" style="background:linear-gradient(90deg,#DC143C,#FF8C00,#228B22,#00008B);color:#fff;font-weight:800">&#128176; RENT</div>
+      <div class="hc-color-bar" style="background:linear-gradient(90deg,#DC143C,#FF8C00,#228B22,#00008B);color:#fff;font-weight:800">Any Color</div>
       <div class="rent-watermark">RENT</div>
       <div class="rent-banner">RENT</div>
       <div class="hc-body" style="position:relative;z-index:1">
         <div style="font-size:16px">&#128176;</div>
-        <div class="hc-name">${esc(card.name)}</div>
-        <div class="hc-desc">Any color</div>
+        <div class="hc-name">Rent</div>
+        ${rentCharge ? `<div class="hc-desc">Charge: $${rentCharge}M</div>` : ''}
       </div>
       <div class="hc-footer">Wild Rent</div>
     `;
@@ -2463,8 +2496,15 @@ function getActionsForCard(card) {
     items.push({ label: `Play to ${COLOR_LABELS[card.color] || card.color}`, action: () => playProperty(card, card.color), flies: true });
   }
   else if (t === 'property_wild') {
-    if (card.color) items.push({ label: `Play as ${COLOR_LABELS[card.color]}`, action: () => playProperty(card, card.color), flies: true });
-    if (card.altColor) items.push({ label: `Play as ${COLOR_LABELS[card.altColor]}`, action: () => playProperty(card, card.altColor), flies: true });
+    const me = gameState.you;
+    const existingColors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+    const hasAny = existingColors.length > 0;
+    if (card.color && (!hasAny || existingColors.includes(card.color)))
+      items.push({ label: `Play as ${COLOR_LABELS[card.color]}`, action: () => playProperty(card, card.color), flies: true });
+    if (card.altColor && (!hasAny || existingColors.includes(card.altColor)))
+      items.push({ label: `Play as ${COLOR_LABELS[card.altColor]}`, action: () => playProperty(card, card.altColor), flies: true });
+    if (hasAny && items.length === 0)
+      items.push({ label: 'No matching property colors', disabled: true });
   }
   else if (t === 'property_wild_all') {
     items.push({ label: 'Play to color...', action: () => pickColorForWild(card) });
@@ -2594,12 +2634,66 @@ function playRent(card, color, targetPlayerId) {
 
 // ---- Color Picker for Wild Property ----
 function pickColorForWild(card) {
-  const colors = Object.keys(COLOR_LABELS);
+  // Only show colors where the player already has properties (or all if none)
+  const me = gameState.you;
+  const existingColors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  const colors = existingColors.length > 0 ? existingColors : Object.keys(COLOR_LABELS);
   openPicker('Choose color', colors.map(c => ({
     label: COLOR_LABELS[c],
     color: COLOR_CSS[c],
     action: () => { closePicker(); playProperty(card, c); }
   })));
+}
+
+// Tap handler for wild cards already in properties — swap to another color
+function onPropertyWildClick(cardId, currentColor) {
+  if (!isMyTurn() || gameState.phase !== 'play') {
+    if (gameState.phase === 'draw') toast("Draw cards first!");
+    else toast("Not your turn");
+    return;
+  }
+  if (gameState.actionsRemaining <= 0) {
+    toast("No actions remaining");
+    return;
+  }
+  haptic('light');
+  const me = gameState.you;
+  // Find the card in properties
+  let card = null;
+  for (const g of me.properties) {
+    card = g.cards.find(c => c.id === cardId);
+    if (card) break;
+  }
+  if (!card) return;
+
+  let targetColors = [];
+  if (card.type === 'property_wild') {
+    // Two-color wild: offer the other color
+    const otherColor = card.color === currentColor ? card.altColor : card.color;
+    if (otherColor && otherColor !== currentColor) targetColors = [otherColor];
+  } else if (card.type === 'property_wild_all') {
+    // Rainbow wild: offer all 10 colors except current
+    targetColors = Object.keys(COLOR_LABELS).filter(c => c !== currentColor);
+  }
+
+  if (targetColors.length === 0) { toast("No other color available"); return; }
+
+  if (targetColors.length === 1) {
+    // Direct swap for two-color wilds
+    const dest = targetColors[0];
+    openPicker(`Swap wild to ${COLOR_LABELS[dest]}?`, [{
+      label: `Swap to ${COLOR_LABELS[dest]} (uses 1 action)`,
+      color: COLOR_CSS[dest],
+      action: () => { closePicker(); sendAction('move_wild_card', { cardId, destinationColor: dest }); }
+    }]);
+  } else {
+    // Color picker for rainbow wilds
+    openPicker('Swap wild to...', targetColors.map(c => ({
+      label: `${COLOR_LABELS[c]} (uses 1 action)`,
+      color: COLOR_CSS[c],
+      action: () => { closePicker(); sendAction('move_wild_card', { cardId, destinationColor: c }); }
+    })));
+  }
 }
 
 // ---- Wild Rent: pick color then pick player ----
@@ -2826,6 +2920,8 @@ function showPaymentModal(pa) {
     container.innerHTML += '<div class="pay-section"><div class="pay-section-title">Properties</div></div>';
     me.properties.forEach(g => {
       g.cards.forEach(c => {
+        // PropertyWildAll (rainbow wilds) cannot be used as payment — $0 value
+        if (c.type === 'property_wild_all') return;
         container.innerHTML += `
           <div class="pay-chip" id="paychip_${c.id}" onclick="togglePayCard('${c.id}')">
             <div class="pay-chip-check"></div>
