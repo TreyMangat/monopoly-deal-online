@@ -10,9 +10,9 @@
 :root{
   --bg:#1a1a2e;--surface:#16213e;--card:#0f3460;--accent:#e94560;
   --text:#eee;--muted:#888;--success:#27ae60;--warn:#f39c12;
-  --brown:#8B4513;--light_blue:#87CEEB;--pink:#FF69B4;--orange:#FF8C00;
-  --red:#DC143C;--yellow:#FFD700;--green:#228B22;--dark_blue:#00008B;
-  --railroad:#555;--utility:#9370DB;
+  --brown:#8B5A2B;--light_blue:#ADD8E6;--pink:#D94893;--orange:#F28C28;
+  --red:#D92525;--yellow:#F2D615;--green:#2EA640;--dark_blue:#2630A5;
+  --railroad:#262626;--utility:#BFBFBF;
 }
 html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 button{font-family:inherit;cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:14px;transition:opacity .15s}
@@ -46,7 +46,11 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 
 /* ---- Lobby ---- */
 #lobby{justify-content:center;align-items:center;gap:16px;padding:20px}
-#lobby .room-code{font-size:36px;font-weight:700;letter-spacing:6px;color:var(--accent)}
+#lobby .room-code-wrapper{display:flex;align-items:center;gap:12px;justify-content:center}
+#lobby .room-code{font-size:24px;font-weight:800;letter-spacing:8px;color:var(--accent);text-shadow:0 0 20px rgba(233,69,96,.3);font-family:'Courier New',Consolas,monospace}
+#lobby .copy-btn{background:rgba(233,69,96,.15);color:var(--accent);border:1px solid rgba(233,69,96,.3);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:background .2s,color .2s}
+#lobby .copy-btn:hover{background:rgba(233,69,96,.3)}
+#lobby .copy-btn.copied{background:var(--success);color:#fff;border-color:var(--success)}
 #lobby .player-list{list-style:none;width:100%;max-width:320px}
 #lobby .player-list li{padding:10px;background:var(--surface);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 #lobby .player-list .host-badge{font-size:10px;background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-weight:700}
@@ -94,13 +98,12 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 .hand-area{flex-shrink:0;background:var(--surface);border-top:2px solid #333;padding:8px 10px 12px}
 .hand-label{font-size:11px;color:var(--muted);margin-bottom:4px}
 .hand-cards{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
-.hand-card{background:var(--card);border:2px solid transparent;border-radius:8px;padding:8px;min-width:80px;max-width:100px;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s;font-size:11px;display:flex;flex-direction:column;gap:2px}
-.hand-card:hover{transform:translateY(-4px)}
-.hand-card.selected{border-color:var(--accent);transform:translateY(-8px)}
-.hand-card .hc-type{font-size:9px;color:var(--muted);text-transform:uppercase}
-.hand-card .hc-name{font-weight:600;font-size:12px;word-break:break-word}
-.hand-card .hc-value{font-size:10px;color:var(--success)}
-.hand-card .hc-color-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.hand-card{position:relative;border:2px solid rgba(255,255,255,.15);border-radius:8px;padding:22px 6px 6px;min-width:70px;max-width:90px;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s,box-shadow .15s;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center;min-height:95px}
+.hand-card:hover{transform:scale(1.05);box-shadow:0 4px 16px rgba(255,255,255,.15)}
+.hand-card.selected{border-color:var(--accent);transform:translateY(-8px);box-shadow:0 6px 20px rgba(233,69,96,.3)}
+.hand-card .hc-badge{position:absolute;top:3px;left:3px;background:rgba(0,0,0,.45);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;line-height:1.2}
+.hand-card .hc-name{font-weight:600;font-size:11px;word-break:break-word;flex:1;display:flex;align-items:center;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.hand-card .hc-type{font-size:8px;text-transform:uppercase;opacity:.85;margin-top:auto;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
 /* End turn btn */
 .hand-actions{display:flex;gap:6px;margin-top:6px;align-items:center}
@@ -171,6 +174,23 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 /* ---- Connection Status ---- */
 #connStatus{position:fixed;top:0;left:0;width:100%;background:var(--accent);color:#fff;text-align:center;padding:4px;font-size:12px;z-index:600;display:none}
 #connStatus.active{display:block}
+
+/* ---- Your Turn Pulse ---- */
+.play-area.your-turn{animation:turnPulse 2s ease-in-out infinite;border:2px solid transparent}
+@keyframes turnPulse{0%,100%{border-color:rgba(0,210,190,.2);box-shadow:inset 0 0 8px rgba(0,210,190,.08)}50%{border-color:rgba(0,210,190,.7);box-shadow:inset 0 0 16px rgba(0,210,190,.15)}}
+
+/* ---- Action Toast ---- */
+#actionToast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(22,33,62,.92);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:500;display:none;white-space:nowrap;border:1px solid rgba(255,255,255,.15);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+#actionToast.active{display:block;animation:toastSlide 3s ease forwards}
+@keyframes toastSlide{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}10%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0}}
+
+/* ---- Mobile ---- */
+@media(max-width:400px){
+  .hand-card{min-width:56px;max-width:72px;min-height:78px;padding:18px 4px 4px;font-size:10px}
+  .hand-card .hc-name{font-size:9px}
+  .hand-card .hc-badge{font-size:8px}
+  .hand-card .hc-type{font-size:7px}
+}
 </style>
 </head>
 <body>
@@ -180,6 +200,7 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 
 <!-- Toast -->
 <div id="toast"></div>
+<div id="actionToast"></div>
 
 <!-- ============ LANDING ============ -->
 <div id="landing" class="screen active">
@@ -212,7 +233,10 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 <!-- ============ LOBBY ============ -->
 <div id="lobby" class="screen">
   <h1>Game Lobby</h1>
-  <div class="room-code" id="lobbyCode"></div>
+  <div class="room-code-wrapper">
+    <div class="room-code" id="lobbyCode"></div>
+    <button class="copy-btn" id="copyCodeBtn" onclick="copyRoomCode()">Copy</button>
+  </div>
   <p class="sub">Share this code with friends</p>
   <ul class="player-list" id="lobbyPlayers"></ul>
   <button class="btn-primary" id="startBtn" onclick="startGame()" style="display:none">Start Game</button>
@@ -406,6 +430,7 @@ function handleMessage(msg) {
       gameState = msg.payload.state;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
         addLog(msg.payload.lastAction.description);
+        showActionToast(msg.payload.lastAction.description);
       }
       renderGame();
       showScreen('game');
@@ -520,6 +545,11 @@ function renderGame() {
   const endBtn = document.getElementById('endTurnBtn');
   endBtn.style.display = isMyTurn && gs.phase === 'play' ? '' : 'none';
   document.getElementById('actRemain').textContent = isMyTurn ? `${gs.actionsRemaining}/3 actions` : '';
+
+  // Your-turn indicator
+  const playArea = document.querySelector('.play-area');
+  if (isMyTurn && gs.phase === 'play') playArea.classList.add('your-turn');
+  else playArea.classList.remove('your-turn');
 
   // Payment modal
   if (gs.phase === 'awaiting_response' && gs.pendingAction) {
@@ -719,23 +749,17 @@ function renderHand() {
     div.className = 'hand-card' + (selectedCardId === card.id ? ' selected' : '');
     div.dataset.cardId = card.id;
 
+    const bg = getCardBackground(card);
+    const txtColor = getCardTextColor(card);
+    div.style.background = bg;
+    div.style.color = txtColor;
+
     const typeLabel = getCardTypeLabel(card);
-    let colorDot = '';
-    if (card.color) {
-      colorDot = `<span class="hc-color-dot" style="background:${COLOR_CSS[card.color] || '#666'}"></span>`;
-      if (card.altColor) {
-        colorDot += `<span class="hc-color-dot" style="background:${COLOR_CSS[card.altColor] || '#666'};margin-left:2px"></span>`;
-      }
-    }
-    if (card.rentColors) {
-      colorDot = card.rentColors.map(c => `<span class="hc-color-dot" style="background:${COLOR_CSS[c] || '#666'}"></span>`).join('');
-    }
 
     div.innerHTML = `
-      <div class="hc-type">${typeLabel}</div>
+      <div class="hc-badge">$${card.bankValue}M</div>
       <div class="hc-name">${esc(card.name)}</div>
-      <div style="display:flex;gap:2px;align-items:center">${colorDot}</div>
-      <div class="hc-value">$${card.bankValue}M</div>
+      <div class="hc-type">${typeLabel}</div>
     `;
 
     div.addEventListener('click', (e) => {
@@ -757,6 +781,33 @@ function getCardTypeLabel(card) {
     rent_wild:'Rent (Any)', rent_two_color:'Rent'
   };
   return map[card.type] || card.type;
+}
+
+// Card background colors
+const CARD_COLORS = {
+  brown:'#8B5A2B',light_blue:'#ADD8E6',pink:'#D94893',orange:'#F28C28',
+  red:'#D92525',yellow:'#F2D615',green:'#2EA640',dark_blue:'#2630A5',
+  railroad:'#262626',utility:'#BFBFBF'
+};
+
+function getCardBackground(card) {
+  const t = card.type;
+  if (t === 'property' && card.color) return CARD_COLORS[card.color] || '#444';
+  if (t === 'property_wild' && card.color && card.altColor)
+    return `linear-gradient(135deg, ${CARD_COLORS[card.color]} 50%, ${CARD_COLORS[card.altColor]} 50%)`;
+  if (t === 'property_wild_all')
+    return 'linear-gradient(135deg, #D92525, #F28C28, #F2D615, #2EA640, #2630A5, #D94893)';
+  if (t === 'money') return '#1F6B38';
+  if (t.startsWith('rent_')) return '#7347A0';
+  if (t.startsWith('action_')) return '#D17830';
+  return '#444';
+}
+
+function getCardTextColor(card) {
+  const light = ['light_blue','yellow','utility'];
+  if (card.type === 'property' && light.includes(card.color)) return '#222';
+  if (card.type === 'property_wild' && (light.includes(card.color) || light.includes(card.altColor))) return '#222';
+  return '#fff';
 }
 
 // ============================================================
@@ -1377,6 +1428,26 @@ function toast(msg) {
   void el.offsetWidth; // force reflow
   el.classList.add('active');
   setTimeout(() => el.classList.remove('active'), 3000);
+}
+
+function showActionToast(msg) {
+  const el = document.getElementById('actionToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 3000);
+}
+
+function copyRoomCode() {
+  if (!roomCode) return;
+  navigator.clipboard.writeText(roomCode).then(() => {
+    const btn = document.getElementById('copyCodeBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => { toast('Copy failed'); });
 }
 
 // Close modals on escape
