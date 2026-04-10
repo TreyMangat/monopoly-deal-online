@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Monopoly Deal Online</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Property Deal</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2ED1C0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Property Deal">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
 /* ---- Reset & Base ---- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -14,7 +20,12 @@
   --red:#D92525;--yellow:#F2D615;--green:#2EA640;--dark_blue:#2630A5;
   --railroad:#262626;--utility:#BFBFBF;
 }
-html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;
+  overscroll-behavior:none;-webkit-overflow-scrolling:touch;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.hand-card,.opp-card,.prop-group,.bank-card{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+button,input{touch-action:manipulation}
 button{font-family:inherit;cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:14px;transition:opacity .15s}
 button:active{opacity:.7}
 input{font-family:inherit;padding:8px 12px;border-radius:6px;border:1px solid #444;background:#222;color:var(--text);font-size:14px;width:100%}
@@ -1473,6 +1484,15 @@ document.getElementById('nameInput').addEventListener('keydown', e => {
 
 // Init ws url display
 document.getElementById('wsUrlInput').value = getWsUrl();
+
+// ---- Register Service Worker (PWA) ----
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('[SW] Registered, scope:', reg.scope))
+      .catch(err => console.warn('[SW] Registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>

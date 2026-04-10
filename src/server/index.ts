@@ -60,6 +60,49 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  // Serve static files from public/ (manifest, service worker, icons)
+  const MIME_TYPES: Record<string, string> = {
+    ".json": "application/json",
+    ".js": "application/javascript",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".webmanifest": "application/manifest+json",
+  };
+
+  const publicDir = path.join(__dirname, "..", "..", "public");
+  const safePath = path.normalize(req.url || "").replace(/^(\.\.[/\\])+/, "");
+  const filePath = path.join(publicDir, safePath);
+
+  // Ensure the resolved path stays within public/
+  if (!filePath.startsWith(publicDir)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+      // Service worker must not be cached (browsers need fresh SW checks)
+      const cacheControl = filePath.endsWith("service-worker.js")
+        ? "no-cache"
+        : "public, max-age=86400";
+
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": cacheControl,
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  } catch {
+    // File not found — fall through to 404
+  }
+
   res.writeHead(404);
   res.end("Not Found");
 });
