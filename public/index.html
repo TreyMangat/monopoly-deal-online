@@ -92,15 +92,17 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   pointer-events:none;z-index:1;opacity:0;animation:sparkleAnim 4s ease-in-out infinite}
 @keyframes sparkleAnim{0%,100%{opacity:0;transform:scale(0)}50%{opacity:.4;transform:scale(1)}}
 
-/* Landing title block — stacked MONOPOLY / DEAL / ONLINE */
-.landing-title-block{position:relative;z-index:1;text-align:center;margin-bottom:40px}
-.landing-title-block .title-monopoly{font-family:'Fredoka',sans-serif;font-size:48px;font-weight:700;
-  color:#fff;letter-spacing:3px;line-height:1;margin-bottom:8px}
-.landing-title-block .title-deal{font-family:'Fredoka',sans-serif;font-size:64px;font-weight:700;
-  color:#FFD700;letter-spacing:2px;line-height:1;margin-bottom:4px;
-  text-shadow:0 0 20px rgba(255,215,0,0.5),0 0 40px rgba(255,215,0,0.2)}
-.landing-title-block .title-online{font-family:'Fredoka',sans-serif;font-size:18px;font-weight:600;
-  color:#2ED1C0;letter-spacing:5px;text-transform:uppercase;line-height:1}
+/* Landing title logo */
+.title-logo{position:relative;z-index:1;display:block;margin:0 auto 40px;
+  max-width:85%;width:500px;height:auto;
+  filter:drop-shadow(0 0 25px rgba(255,215,0,0.4)) drop-shadow(0 0 12px rgba(255,255,255,0.2));
+  animation:titleFloat 4s ease-in-out infinite}
+@keyframes titleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@media(max-width:500px){.title-logo{max-width:90%}}
+
+/* Lobby/join header logo — smaller, static */
+.header-logo{display:block;margin:0 auto 12px;max-width:60%;width:280px;height:auto;
+  filter:drop-shadow(0 0 15px rgba(255,215,0,0.3))}
 
 #landing .group{display:flex;flex-direction:column;gap:12px;width:100%;max-width:340px;z-index:1}
 #landing .row{display:flex;gap:8px}
@@ -134,9 +136,6 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 #lobby::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
   background:rgba(0,0,0,0.6);pointer-events:none;z-index:0}
 #lobby>*{position:relative;z-index:1}
-#lobby .lobby-header{color:#fff;font-family:'Fredoka',sans-serif;font-weight:700;
-  font-size:28px;letter-spacing:1px;text-align:center}
-#lobby .lobby-header .lh-deal{color:var(--gold-bright);text-shadow:0 0 12px rgba(255,215,0,.3)}
 #lobby .lobby-panel{background:rgba(10,22,40,.7);border-radius:20px;border:2px solid rgba(201,169,78,.25);
   padding:24px;width:100%;max-width:380px;
   box-shadow:0 8px 32px rgba(0,0,0,.4);
@@ -898,9 +897,6 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   .table-center{gap:16px;padding:12px 8px}
   .draw-pile-stack,.card-back{width:54px;height:76px}
   .discard-card{width:54px;height:76px}
-  .landing-title-block .title-monopoly{font-size:36px}
-  .landing-title-block .title-deal{font-size:48px}
-  .landing-title-block .title-online{font-size:14px;letter-spacing:3px}
 }
 </style>
 </head>
@@ -930,12 +926,8 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   <span class="sparkle" style="top:25%;right:15%;animation-delay:1.5s"></span>
   <span class="sparkle" style="top:55%;left:10%;animation-delay:3s"></span>
   <span class="sparkle" style="top:70%;right:20%;animation-delay:4.5s"></span>
-  <!-- Stacked title -->
-  <div class="landing-title-block">
-    <div class="title-monopoly">MONOPOLY</div>
-    <div class="title-deal">DEAL</div>
-    <div class="title-online">ONLINE</div>
-  </div>
+  <!-- Title logo -->
+  <img src="/images/title-logo.png" alt="Monopoly Deal Online" class="title-logo">
   <div class="group">
     <input id="nameInput" placeholder="Your name" maxlength="20" autocomplete="off">
     <button class="btn-primary" onclick="createRoom()">Create Room</button>
@@ -962,7 +954,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 <!-- ============ LOBBY ============ -->
 <div id="lobby" class="screen">
-  <div class="lobby-header">MONOPOLY <span class="lh-deal">DEAL</span></div>
+  <img src="/images/title-logo.png" alt="Monopoly Deal Online" class="header-logo">
   <div class="lobby-panel">
     <div class="room-code-wrapper">
       <div class="room-code" id="lobbyCode"></div>
