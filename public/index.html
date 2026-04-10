@@ -665,6 +665,40 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
   0%,100%{transform:scale(1);opacity:1}
   50%{transform:scale(.98);opacity:.85}}
 
+/* ============================================================
+   HOST END GAME & LEAVE BUTTON
+   ============================================================ */
+.top-bar-right{display:flex;align-items:center;gap:6px}
+.btn-end-game{background:var(--accent);color:#fff;padding:4px 10px;font-size:11px;font-weight:700;
+  border-radius:6px;display:none}
+.btn-leave-game{background:none;color:var(--muted);font-size:18px;padding:2px 6px;border-radius:4px}
+
+/* ============================================================
+   VOTE SCREEN
+   ============================================================ */
+#voteScreen{justify-content:center;align-items:center;gap:16px;padding:20px;text-align:center;
+  padding-top:calc(20px + var(--safe-top));
+  background:radial-gradient(ellipse at center,var(--felt) 0%,var(--felt-dark) 100%)}
+#voteScreen h1{font-size:28px;color:var(--gold-bright);text-shadow:0 2px 8px rgba(0,0,0,.5)}
+#voteScreen .vote-sub{color:var(--muted);font-size:14px;margin-bottom:4px}
+.vote-winner-sets{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 16px}
+.vote-tally{font-size:15px;color:var(--cream);margin-bottom:12px;line-height:1.8}
+.vote-tally .vt-item{display:inline-block;padding:4px 12px;border-radius:20px;margin:2px 4px;
+  font-weight:600;font-size:14px}
+.vote-tally .vt-play{background:rgba(39,174,96,.2);color:var(--success);border:1px solid rgba(39,174,96,.3)}
+.vote-tally .vt-leave{background:rgba(233,69,96,.2);color:var(--accent);border:1px solid rgba(233,69,96,.3)}
+.vote-tally .vt-wait{background:rgba(255,255,255,.08);color:var(--muted);border:1px solid rgba(255,255,255,.1)}
+.vote-timer{font-size:32px;font-weight:800;color:var(--gold-bright);margin-bottom:16px;
+  text-shadow:0 0 16px rgba(255,215,0,.3)}
+.vote-timer.urgent{color:var(--accent);animation:timerPulse .5s ease-in-out infinite}
+.vote-btns{display:flex;gap:12px;width:100%;max-width:340px}
+.vote-btns button{flex:1;padding:16px;font-size:18px;font-weight:700;border-radius:12px}
+.btn-vote-play{background:linear-gradient(135deg,var(--success),#1e8449);color:#fff;
+  box-shadow:0 4px 16px rgba(39,174,96,.3)}
+.btn-vote-leave{background:rgba(255,255,255,.08);color:var(--muted);border:1px solid rgba(255,255,255,.15)}
+.vote-btns button.voted{opacity:.5;transform:scale(.97);pointer-events:none}
+.vote-btns button.my-vote{opacity:1;border:2px solid var(--gold-bright);transform:scale(1)}
+
 /* ---- Mobile-specific (small phones) ---- */
 @media(max-width:374px){
   .hand-card{min-width:62px;max-width:78px;min-height:96px}
@@ -741,7 +775,11 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
     </div>
     <span class="actions-left" id="actionsLeft">3 actions left</span>
     <span class="pile-info" id="pileInfo">Deck: 0</span>
-    <button class="mute-btn" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#128266;</button>
+    <div class="top-bar-right">
+      <button class="btn-end-game" id="endGameBtn" onclick="confirmEndGame()">End Game</button>
+      <button class="btn-leave-game" id="leaveGameBtn" onclick="confirmLeaveGame()" title="Leave game">&#10005;</button>
+      <button class="mute-btn" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#128266;</button>
+    </div>
   </div>
 
   <!-- Scrollable middle -->
@@ -840,12 +878,17 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
 <div id="goldFlash" class="gold-flash"></div>
 <div id="stealZoom" class="steal-zoom"></div>
 
-<!-- ============ GAME OVER ============ -->
-<div id="gameOver" class="screen">
+<!-- ============ VOTE SCREEN ============ -->
+<div id="voteScreen" class="screen">
   <h1 id="winnerText">Player Wins!</h1>
-  <p class="sub">Game Over</p>
-  <div class="winner-sets" id="winnerSets"></div>
-  <button class="btn-primary" style="margin-top:20px" onclick="backToLanding()">Play Again</button>
+  <p class="vote-sub" id="voteSub">Game Over</p>
+  <div class="vote-winner-sets" id="winnerSets"></div>
+  <div class="vote-tally" id="voteTally"></div>
+  <div class="vote-timer" id="voteTimer">15</div>
+  <div class="vote-btns" id="voteBtns">
+    <button class="btn-vote-play" id="votePlayBtn" onclick="castVote('play_again')">Play Again</button>
+    <button class="btn-vote-leave" id="voteLeaveBtn" onclick="castVote('leave')">Leave</button>
+  </div>
 </div>
 
 <script>
@@ -862,6 +905,8 @@ let selectedCardId = null;
 let actionLogs = [];
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let myVote = null;
+let voteCountdown = null;
 
 // Track previous turn for animation triggers
 let prevTurnNumber = 0;
@@ -1323,6 +1368,9 @@ function handleMessage(msg) {
     case 'game_over':
       showGameOver(msg.payload);
       break;
+    case 'vote_update':
+      handleVoteUpdate(msg.payload);
+      break;
     case 'player_reconnected':
       addLog(msg.payload.playerName + ' reconnected');
       break;
@@ -1430,6 +1478,10 @@ function renderGame() {
 
   // Hand
   renderHand();
+
+  // Host end game button
+  const endGameBtn = document.getElementById('endGameBtn');
+  endGameBtn.style.display = (hostId === myPlayerId) ? '' : 'none';
 
   // End turn button — visible only during Play phase on your turn
   const endBtn = document.getElementById('endTurnBtn');
@@ -2599,13 +2651,19 @@ function toggleLog() {
 // GAME OVER
 // ============================================================
 function showGameOver(payload) {
-  showScreen('gameOver');
+  // Show winner info on vote screen but don't switch yet — wait for vote_update
   const isMe = payload.winnerId === myPlayerId;
-  document.getElementById('winnerText').textContent = isMe ? 'You Win!' : `${payload.winnerName} Wins!`;
+  if (payload.winnerId) {
+    document.getElementById('winnerText').textContent = isMe ? 'You Win!' : `${payload.winnerName} Wins!`;
+    document.getElementById('voteSub').textContent = 'Game Over — Vote on what to do next';
+  } else {
+    document.getElementById('winnerText').textContent = 'Game Ended';
+    document.getElementById('voteSub').textContent = 'Host ended the game — Vote on what to do next';
+  }
 
   const setsDiv = document.getElementById('winnerSets');
   setsDiv.innerHTML = '';
-  if (gameState) {
+  if (gameState && payload.winnerId) {
     const allPlayers = [gameState.you, ...gameState.opponents];
     const winner = allPlayers.find(p => p.id === payload.winnerId);
     if (winner && winner.properties) {
@@ -2622,13 +2680,106 @@ function showGameOver(payload) {
       });
     }
   }
+
+  // Reset vote state
+  myVote = null;
+  document.getElementById('votePlayBtn').classList.remove('voted', 'my-vote');
+  document.getElementById('voteLeaveBtn').classList.remove('voted', 'my-vote');
+  document.getElementById('votePlayBtn').disabled = false;
+  document.getElementById('voteLeaveBtn').disabled = false;
+
+  showScreen('voteScreen');
+}
+
+function handleVoteUpdate(payload) {
+  if (payload.resolved) {
+    clearInterval(voteCountdown);
+    voteCountdown = null;
+    if (payload.result === 'leave' || payload.result === 'you_left') {
+      // Room closing — back to landing
+      backToLanding();
+      toast(payload.result === 'you_left' ? 'You left the game' : 'Majority voted to leave');
+      return;
+    }
+    if (payload.result === 'play_again') {
+      // New game will arrive as game_state_update — will auto-switch to game screen
+      return;
+    }
+    return;
+  }
+
+  // Update tally display
+  const v = payload.votes;
+  const tallyEl = document.getElementById('voteTally');
+  tallyEl.innerHTML = `
+    <span class="vt-item vt-play">Play Again: ${v.play_again}/${v.total}</span>
+    <span class="vt-item vt-leave">Leave: ${v.leave}/${v.total}</span>
+    <span class="vt-item vt-wait">Waiting: ${v.waiting}/${v.total}</span>
+  `;
+
+  // Update timer
+  const timerEl = document.getElementById('voteTimer');
+  timerEl.textContent = payload.secondsRemaining;
+  timerEl.classList.toggle('urgent', payload.secondsRemaining <= 5);
+
+  // Make sure we're on the vote screen
+  if (!document.getElementById('voteScreen').classList.contains('active')) {
+    showScreen('voteScreen');
+  }
+}
+
+function castVote(vote) {
+  if (myVote) return; // already voted
+  myVote = vote;
+  send('cast_vote', { roomCode, vote });
+  haptic('medium');
+
+  // Update button states
+  const playBtn = document.getElementById('votePlayBtn');
+  const leaveBtn = document.getElementById('voteLeaveBtn');
+  playBtn.disabled = true;
+  leaveBtn.disabled = true;
+  if (vote === 'play_again') {
+    playBtn.classList.add('my-vote');
+    leaveBtn.classList.add('voted');
+  } else {
+    leaveBtn.classList.add('my-vote');
+    playBtn.classList.add('voted');
+  }
+
+  // If voted leave, return to landing immediately
+  if (vote === 'leave') {
+    setTimeout(() => backToLanding(), 300);
+  }
+}
+
+function confirmEndGame() {
+  if (!confirm('End game for all players?')) return;
+  send('end_game', { roomCode });
+}
+
+function confirmLeaveGame() {
+  if (!confirm('Leave this game?')) return;
+  // During vote phase, cast a leave vote
+  if (document.getElementById('voteScreen').classList.contains('active')) {
+    if (!myVote) castVote('leave');
+    else backToLanding();
+    return;
+  }
+  // During game, send leave_game so server can handle early quit
+  send('leave_game', { roomCode });
+  backToLanding();
 }
 
 function backToLanding() {
   gameState = null;
   myPlayerId = null;
   roomCode = null;
+  hostId = null;
+  myVote = null;
   actionLogs = [];
+  clearInterval(voteCountdown);
+  voteCountdown = null;
   showScreen('landing');
 }
 

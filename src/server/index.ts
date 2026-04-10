@@ -310,6 +310,95 @@ function handleClientMessage(
       break;
     }
 
+    case ClientMessageType.CastVote: {
+      const { roomCode: voteRoomCode, vote } = payload;
+      const voteRoom = roomManager.getRoom(voteRoomCode);
+      if (!voteRoom) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "ROOM_NOT_FOUND",
+            message: "Room not found",
+          })
+        );
+        return;
+      }
+      const voter = voteRoom.players.find((p) => p.ws === ws);
+      if (!voter) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "NOT_IN_ROOM",
+            message: "You are not in this room",
+          })
+        );
+        return;
+      }
+      const voteResult = voteRoom.castVote(voter.id, vote);
+      if (!voteResult.success) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "VOTE_FAILED",
+            message: voteResult.error,
+          })
+        );
+      }
+      break;
+    }
+
+    case ClientMessageType.EndGame: {
+      const { roomCode: endRoomCode } = payload;
+      const endRoom = roomManager.getRoom(endRoomCode);
+      if (!endRoom) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "ROOM_NOT_FOUND",
+            message: "Room not found",
+          })
+        );
+        return;
+      }
+      const requesterPlayer = endRoom.players.find((p) => p.ws === ws);
+      if (!requesterPlayer) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "NOT_IN_ROOM",
+            message: "You are not in this room",
+          })
+        );
+        return;
+      }
+      const endResult = endRoom.forceEndGame(requesterPlayer.id);
+      if (!endResult.success) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "END_GAME_FAILED",
+            message: endResult.error,
+          })
+        );
+      }
+      break;
+    }
+
+    case ClientMessageType.LeaveGame: {
+      const { roomCode: leaveRoomCode } = payload;
+      const leaveRoom = roomManager.getRoom(leaveRoomCode);
+      if (!leaveRoom) break;
+      const leaver = leaveRoom.players.find((p) => p.ws === ws);
+      if (!leaver) break;
+
+      // Try early quit (first turn, no cards played)
+      if (
+        leaveRoom.status === "playing" &&
+        leaveRoom.handleEarlyQuit(leaver.id)
+      ) {
+        // Player was removed from game
+        break;
+      }
+
+      // Otherwise just disconnect normally
+      leaveRoom.handleDisconnect(leaver.id);
+      break;
+    }
+
     case ClientMessageType.Pong: {
       // Client responding to our ping — handled by ws 'pong' event
       break;

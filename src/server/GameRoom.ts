@@ -20,6 +20,7 @@ import {
   ServerMessageType,
   PendingActionType,
   Card,
+  CardType,
 } from "../shared/types";
 import {
   MAX_PLAYERS,
@@ -32,6 +33,7 @@ import {
   TIMER_UPDATE_INTERVAL_MS,
 } from "../shared/constants";
 import { initializeGame, applyAction } from "../engine/GameEngine";
+import { shuffle } from "../engine/helpers";
 import { serverMsg } from "../shared/protocol";
 
 interface ConnectedPlayer {
@@ -64,6 +66,15 @@ export class GameRoom {
   private skippedPlayerIds: Set<string> = new Set();
   private disconnectTimers: Map<string, ReturnType<typeof setTimeout>> =
     new Map();
+
+  // Vote state
+  private votes: Map<string, "play_again" | "leave"> = new Map();
+  private voteTimer: ReturnType<typeof setTimeout> | null = null;
+  private voteTimerInterval: ReturnType<typeof setInterval> | null = null;
+  private voteDeadline: number = 0;
+
+  // Track if any cards have been played this game (for early quit)
+  private cardsPlayedByPlayer: Map<string, number> = new Map();
 
   constructor(
     code: string,
@@ -209,6 +220,12 @@ export class GameRoom {
       })
     );
 
+    // During voting, treat disconnect as "leave" vote
+    if (this.status === RoomStatus.Voting) {
+      this.castVote(playerId, "leave");
+      return;
+    }
+
     // Handle disconnect during active game
     if (this.gameState && this.status === RoomStatus.Playing) {
       const currentPlayer =
@@ -251,6 +268,10 @@ export class GameRoom {
     }
 
     this.status = RoomStatus.Playing;
+
+    // Reset play tracking for early quit detection
+    this.cardsPlayedByPlayer.clear();
+    this.players.forEach((p) => this.cardsPlayedByPlayer.set(p.id, 0));
 
     this.gameState = initializeGame(
       this.code,
@@ -308,6 +329,20 @@ export class GameRoom {
     // Update the authoritative state
     this.gameState = result.state;
 
+    // Track card plays for early quit detection
+    const playActions = [
+      ActionType.PlayPropertyCard, ActionType.PlayMoneyToBank,
+      ActionType.PlayActionToBank, ActionType.PlayPassGo,
+      ActionType.PlayRentCard, ActionType.PlayDebtCollector,
+      ActionType.PlayBirthday, ActionType.PlaySlyDeal,
+      ActionType.PlayForcedDeal, ActionType.PlayDealBreaker,
+      ActionType.PlayHouse, ActionType.PlayHotel, ActionType.PlayDoubleRent,
+    ];
+    if (playActions.includes(action.type)) {
+      const prev = this.cardsPlayedByPlayer.get(action.playerId) || 0;
+      this.cardsPlayedByPlayer.set(action.playerId, prev + 1);
+    }
+
     // Clear existing timers — we'll set new ones based on new state
     this.clearTimers();
 
@@ -316,7 +351,6 @@ export class GameRoom {
 
     // Check for game over
     if (this.gameState.phase === TurnPhase.GameOver) {
-      this.status = RoomStatus.Finished;
       const winner = this.gameState.players.find(
         (p) => p.id === this.gameState!.winnerId
       );
@@ -326,6 +360,7 @@ export class GameRoom {
           winnerName: winner?.name || "Unknown",
         })
       );
+      this.startVote();
       return { success: true };
     }
 
@@ -543,6 +578,302 @@ export class GameRoom {
     return ids;
   }
 
+  // ---- Vote System ----
+
+  startVote(): void {
+    this.status = RoomStatus.Voting;
+    this.votes.clear();
+    this.clearTimers();
+    this.voteDeadline = Date.now() + 15000;
+
+    this.broadcastVoteUpdate();
+
+    // 15-second countdown
+    this.voteTimer = setTimeout(() => {
+      this.voteTimer = null;
+      this.clearVoteTimerInterval();
+      this.resolveVote();
+    }, 15000);
+
+    this.voteTimerInterval = setInterval(() => {
+      this.broadcastVoteUpdate();
+    }, 1000);
+  }
+
+  castVote(
+    playerId: string,
+    vote: "play_again" | "leave"
+  ): { success: boolean; error?: string } {
+    if (this.status !== RoomStatus.Voting) {
+      return { success: false, error: "Not in voting phase" };
+    }
+    if (!this.players.some((p) => p.id === playerId)) {
+      return { success: false, error: "Not in this room" };
+    }
+
+    this.votes.set(playerId, vote);
+    this.lastActivityAt = Date.now();
+
+    // If player voted leave, disconnect them immediately
+    if (vote === "leave") {
+      const player = this.players.find((p) => p.id === playerId);
+      if (player?.ws) {
+        player.ws.send(
+          serverMsg(ServerMessageType.VoteUpdate, {
+            votes: this.getVoteTally(),
+            secondsRemaining: 0,
+            resolved: true,
+            result: "you_left",
+          })
+        );
+      }
+    }
+
+    this.broadcastVoteUpdate();
+
+    // Check if all connected players have voted
+    const connectedPlayers = this.players.filter(
+      (p) => p.ws !== null || this.votes.has(p.id)
+    );
+    const allVoted = connectedPlayers.every((p) => this.votes.has(p.id));
+    if (allVoted) {
+      this.clearVoteTimer();
+      this.clearVoteTimerInterval();
+      this.resolveVote();
+    }
+
+    return { success: true };
+  }
+
+  resolveVote(): void {
+    if (this.status !== RoomStatus.Voting) return;
+
+    this.clearVoteTimer();
+    this.clearVoteTimerInterval();
+
+    // Anyone who hasn't voted counts as "play_again"
+    for (const player of this.players) {
+      if (!this.votes.has(player.id)) {
+        this.votes.set(player.id, "play_again");
+      }
+    }
+
+    const playAgainCount = [...this.votes.values()].filter(
+      (v) => v === "play_again"
+    ).length;
+    const leaveCount = [...this.votes.values()].filter(
+      (v) => v === "leave"
+    ).length;
+
+    const majority = playAgainCount > leaveCount;
+
+    if (majority) {
+      // Remove players who voted leave
+      const leavers = [...this.votes.entries()]
+        .filter(([, v]) => v === "leave")
+        .map(([id]) => id);
+      this.players = this.players.filter((p) => !leavers.includes(p.id));
+
+      // Update host if needed
+      if (this.players.length > 0 && !this.players.some((p) => p.id === this.hostId)) {
+        this.hostId = this.players[0].id;
+      }
+
+      if (this.players.length >= MIN_PLAYERS) {
+        // Restart game immediately
+        this.votes.clear();
+        this.cardsPlayedByPlayer.clear();
+        this.skippedPlayerIds.clear();
+        this.players.forEach((p) => this.cardsPlayedByPlayer.set(p.id, 0));
+
+        this.status = RoomStatus.Playing;
+        this.gameState = initializeGame(
+          this.code,
+          this.players.map((p) => ({
+            id: p.id,
+            name: p.name,
+            avatar: p.avatar,
+          }))
+        );
+
+        this.broadcast(
+          serverMsg(ServerMessageType.VoteUpdate, {
+            votes: this.getVoteTally(),
+            secondsRemaining: 0,
+            resolved: true,
+            result: "play_again",
+          })
+        );
+
+        this.broadcastGameState("New game started — Play Again won the vote!");
+
+        const firstPlayer =
+          this.gameState.players[this.gameState.currentPlayerIndex];
+        this.startTurnTimer(firstPlayer.id);
+      } else {
+        // Not enough players to continue
+        this.status = RoomStatus.Finished;
+        this.broadcast(
+          serverMsg(ServerMessageType.VoteUpdate, {
+            votes: this.getVoteTally(),
+            secondsRemaining: 0,
+            resolved: true,
+            result: "leave",
+          })
+        );
+      }
+    } else {
+      // Majority leave — room closes
+      this.status = RoomStatus.Finished;
+      this.broadcast(
+        serverMsg(ServerMessageType.VoteUpdate, {
+          votes: this.getVoteTally(),
+          secondsRemaining: 0,
+          resolved: true,
+          result: "leave",
+        })
+      );
+    }
+  }
+
+  private getVoteTally(): {
+    play_again: number;
+    leave: number;
+    waiting: number;
+    total: number;
+  } {
+    const total = this.players.length;
+    const playAgain = [...this.votes.values()].filter(
+      (v) => v === "play_again"
+    ).length;
+    const leave = [...this.votes.values()].filter(
+      (v) => v === "leave"
+    ).length;
+    return {
+      play_again: playAgain,
+      leave,
+      waiting: total - playAgain - leave,
+      total,
+    };
+  }
+
+  private broadcastVoteUpdate(): void {
+    const secondsRemaining = Math.max(
+      0,
+      Math.ceil((this.voteDeadline - Date.now()) / 1000)
+    );
+    this.broadcast(
+      serverMsg(ServerMessageType.VoteUpdate, {
+        votes: this.getVoteTally(),
+        secondsRemaining,
+        resolved: false,
+      })
+    );
+  }
+
+  private clearVoteTimer(): void {
+    if (this.voteTimer) {
+      clearTimeout(this.voteTimer);
+      this.voteTimer = null;
+    }
+  }
+
+  private clearVoteTimerInterval(): void {
+    if (this.voteTimerInterval) {
+      clearInterval(this.voteTimerInterval);
+      this.voteTimerInterval = null;
+    }
+  }
+
+  // ---- Force End Game (host only) ----
+
+  forceEndGame(requesterId: string): { success: boolean; error?: string } {
+    if (requesterId !== this.hostId) {
+      return { success: false, error: "Only the host can end the game" };
+    }
+    if (this.status !== RoomStatus.Playing || !this.gameState) {
+      return { success: false, error: "No active game to end" };
+    }
+
+    this.clearTimers();
+    this.gameState.phase = TurnPhase.GameOver;
+    this.gameState.winnerId = null;
+
+    this.broadcastGameState("Host ended the game");
+    this.broadcast(
+      serverMsg(ServerMessageType.GameOver, {
+        winnerId: null,
+        winnerName: null,
+      })
+    );
+    this.startVote();
+    return { success: true };
+  }
+
+  // ---- Early Quit (first turn, no cards played) ----
+
+  handleEarlyQuit(playerId: string): boolean {
+    if (!this.gameState || this.status !== RoomStatus.Playing) return false;
+
+    // Only during the first turn
+    if (this.gameState.turnNumber > 1) return false;
+
+    // Only if this player has played zero cards
+    const played = this.cardsPlayedByPlayer.get(playerId) || 0;
+    if (played > 0) return false;
+
+    const playerIdx = this.gameState.players.findIndex(
+      (p) => p.id === playerId
+    );
+    if (playerIdx === -1) return false;
+
+    const player = this.gameState.players[playerIdx];
+    const playerName = player.name;
+
+    // Return hand to deck and reshuffle
+    this.gameState.deck.push(...player.hand);
+    this.gameState.deck = shuffle(this.gameState.deck);
+
+    // Remove from game state
+    this.gameState.players.splice(playerIdx, 1);
+
+    // Fix currentPlayerIndex if needed
+    if (this.gameState.currentPlayerIndex >= this.gameState.players.length) {
+      this.gameState.currentPlayerIndex = 0;
+    } else if (this.gameState.currentPlayerIndex > playerIdx) {
+      this.gameState.currentPlayerIndex--;
+    }
+
+    // Remove from connected players
+    this.players = this.players.filter((p) => p.id !== playerId);
+    this.cardsPlayedByPlayer.delete(playerId);
+
+    // Update host if needed
+    if (this.hostId === playerId && this.players.length > 0) {
+      this.hostId = this.players[0].id;
+    }
+
+    // Check if enough players remain
+    if (this.gameState.players.length < MIN_PLAYERS) {
+      this.clearTimers();
+      this.gameState.phase = TurnPhase.GameOver;
+      this.gameState.winnerId = null;
+      this.broadcastGameState(
+        `${playerName} left before playing — not enough players to continue`
+      );
+      this.status = RoomStatus.Finished;
+      return true;
+    }
+
+    this.clearTimers();
+    this.broadcastGameState(
+      `${playerName} left before playing — removed from game`
+    );
+    this.setupTimersForCurrentState();
+
+    return true;
+  }
+
   // ---- State Broadcasting ----
 
   private broadcastGameState(description: string): void {
@@ -659,6 +990,8 @@ export class GameRoom {
   /** Clean up all timers when the room is destroyed */
   destroy(): void {
     this.clearTimers();
+    this.clearVoteTimer();
+    this.clearVoteTimerInterval();
     for (const timer of this.disconnectTimers.values()) {
       clearTimeout(timer);
     }

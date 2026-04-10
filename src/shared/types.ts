@@ -206,6 +206,7 @@ export enum ServerMessageType {
   ActionRejected = "action_rejected",
   ActionResolved = "action_resolved",
   GameOver = "game_over",
+  VoteUpdate = "vote_update",
   TimerUpdate = "timer_update",
   Error = "error",
   Ping = "ping",
@@ -249,6 +250,9 @@ export enum ClientMessageType {
   JoinRoom = "join_room",
   StartGame = "start_game",
   PlayerAction = "player_action",
+  CastVote = "cast_vote",
+  EndGame = "end_game",
+  LeaveGame = "leave_game",
   Pong = "pong",
 }
 
@@ -262,6 +266,7 @@ export interface ClientMessage {
 export enum RoomStatus {
   Waiting = "waiting",
   Playing = "playing",
+  Voting = "voting",
   Finished = "finished",
 }
 
