@@ -33,6 +33,12 @@ ios/MonopolyDeal/
     GameBoard/
       HandView.swift              → Horizontal ScrollView of hand cards, tappable when your turn
       BankView.swift              → Bank total header + card chips, selectable in payment mode
+      ActionLogView.swift         → Slide-up panel showing recent game actions, newest first
+    Responses/
+      PaymentDemandView.swift     → Full-screen modal for paying rent/debt/birthday (non-dismissible)
+      JustSayNoChainView.swift    → Counter-chain UI for Just Say No interactions
+      DiscardView.swift           → End-of-turn discard picker when hand exceeds 7 cards
+    GameOverView.swift            → Winner celebration, winning sets, stats, play again / menu
   Utilities/
     CardDesignSystem.swift        → PropertyColor colors/names/setSizes, CardType display, CardStyleConfig, GameColors theme
 ```
@@ -79,8 +85,9 @@ ios/MonopolyDeal/
 - [ ] Game board view (properties, opponents, turn controls)
 - [ ] Action selection UI (play card, target player, pay debt)
 - [ ] Timer countdown display
-- [ ] Pending action response UI (pay, Just Say No, accept)
-- [ ] Discard picker
-- [ ] Game over screen
+- [x] Pending action response UI (pay, Just Say No, accept)
+- [x] Discard picker
+- [x] Game over screen
+- [x] Action log panel
 - [ ] Haptics + sound effects
 - [ ] Card animations (deal, play, steal)
