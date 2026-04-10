@@ -2,6 +2,12 @@
 
 A real-time multiplayer Monopoly Deal card game server supporting 2–6 players across networks.
 
+## Live Demo
+
+**Play now:** https://monopoly-deal-online.onrender.com
+
+> Hosted on Render free tier. The server sleeps after ~15 minutes of inactivity — first load may take ~30 seconds to wake up.
+
 ## Architecture
 
 ```

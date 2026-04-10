@@ -74,12 +74,13 @@ src/__tests__/ → Vitest unit tests
 
 ## Deployment
 
-- **Platform**: Railway (NIXPACKS builder)
-- **URL**: https://monopoly-deal-online.up.railway.app (update after deploy)
-- **Config**: `railway.json` — build: `npm install && npm run build`, start: `npm start`
-- **PORT**: Railway injects `process.env.PORT` automatically; server reads it in `server/index.ts`
+- **Platform**: Render free tier (Docker)
+- **Live URL**: https://monopoly-deal-online.onrender.com
+- **WebSocket**: wss://monopoly-deal-online.onrender.com/ws
+- **Cold starts**: Free tier spins down after ~15min idle; first request takes ~30s to wake
+- **Config**: `render.yaml` + `Dockerfile`
+- **PORT**: Render injects `process.env.PORT` automatically; server reads it in `server/index.ts`
 - **Static files**: `public/index.html` served at `/` via `fs.readFileSync`
-- **Dockerfile**: Also available for Docker-based deploys (Railway, Render, Fly.io)
 
 ## Current Status
 
@@ -88,7 +89,7 @@ src/__tests__/ → Vitest unit tests
 - [x] WebSocket server with room management
 - [x] Unit tests (43 passing)
 - [x] Browser test client (public/index.html)
-- [x] Deploy to Railway
+- [x] Deploy to Render
 - [ ] CLAUDE.md for iOS client
 - [ ] iOS SwiftUI client
 - [ ] Card animations

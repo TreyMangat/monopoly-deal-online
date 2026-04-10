@@ -12,7 +12,7 @@
 - **Game Engine:** Pure TypeScript, server-authoritative, no I/O
 - **Client (current):** Browser test client (vanilla HTML/CSS/JS)
 - **Client (planned):** iOS SwiftUI app
-- **Hosting target:** Railway free tier (or Render/Fly.io/Oracle Cloud)
+- **Hosting target:** Render free tier (Docker)
 - **Multiplayer:** WebSocket, 2-6 players across different networks
 - **Room system:** 6-char alphanumeric codes, host starts game
 
@@ -52,7 +52,7 @@ CLAUDE.md                  — Claude Code project context
 - [x] Browser test client (public/index.html) — full playable game in browser
 - [x] Server hardening — turn timers, disconnect handling, rate limiting
 - [x] Engine edge cases — reshuffle, payment wilds, house/hotel teardown
-- [x] Deploy to Railway
+- [x] Deploy to Render — https://monopoly-deal-online.onrender.com
 
 ### Sprint 3 (planned) — iOS Client
 - [ ] Xcode project setup (SwiftUI)
