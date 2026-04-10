@@ -6,6 +6,8 @@
 // ============================================================
 
 import http from "http";
+import fs from "fs";
+import path from "path";
 import { WebSocketServer, WebSocket } from "ws";
 import { RoomManager } from "./RoomManager";
 import {
@@ -44,22 +46,17 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Simple landing page
+  // Serve browser client
   if (req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-        <head><title>Monopoly Deal Online</title></head>
-        <body style="font-family: system-ui; max-width: 600px; margin: 40px auto; padding: 0 20px;">
-          <h1>🎴 Monopoly Deal Online</h1>
-          <p>WebSocket game server is running.</p>
-          <p><a href="/stats">Server Stats</a> | <a href="/health">Health Check</a></p>
-          <hr>
-          <p>Connect your iOS client to <code>wss://your-domain/ws</code></p>
-        </body>
-      </html>
-    `);
+    const htmlPath = path.join(__dirname, "..", "..", "public", "index.html");
+    try {
+      const html = fs.readFileSync(htmlPath, "utf-8");
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(html);
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Could not load index.html");
+    }
     return;
   }
 
