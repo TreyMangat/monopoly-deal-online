@@ -11,89 +11,120 @@
 <meta name="apple-mobile-web-app-title" content="Property Deal">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
+/* ============================================================
+   PROPERTY DEAL — Mobile-First PWA Styles
+   ============================================================ */
+
 /* ---- Reset & Base ---- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#1a1a2e;--surface:#16213e;--card:#0f3460;--accent:#e94560;
+  --teal:#2ED1C0;
   --text:#eee;--muted:#888;--success:#27ae60;--warn:#f39c12;
   --brown:#8B5A2B;--light_blue:#ADD8E6;--pink:#D94893;--orange:#F28C28;
   --red:#D92525;--yellow:#F2D615;--green:#2EA640;--dark_blue:#2630A5;
   --railroad:#262626;--utility:#BFBFBF;
+  --safe-top:env(safe-area-inset-top);
+  --safe-bottom:env(safe-area-inset-bottom);
+  --safe-left:env(safe-area-inset-left);
+  --safe-right:env(safe-area-inset-right);
 }
-html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;
-  overscroll-behavior:none;-webkit-overflow-scrolling:touch;
-  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
-  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
-.hand-card,.opp-card,.prop-group,.bank-card{-webkit-user-select:none;user-select:none;touch-action:manipulation}
-button,input{touch-action:manipulation}
-button{font-family:inherit;cursor:pointer;border:none;border-radius:6px;padding:8px 16px;font-size:14px;transition:opacity .15s}
-button:active{opacity:.7}
-input{font-family:inherit;padding:8px 12px;border-radius:6px;border:1px solid #444;background:#222;color:var(--text);font-size:14px;width:100%}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;
+  overscroll-behavior:none;-webkit-overflow-scrolling:touch}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;padding:10px 18px;font-size:15px;
+  transition:opacity .15s,transform .1s;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+button:active{opacity:.7;transform:scale(.97)}
+input{font-family:inherit;padding:10px 14px;border-radius:8px;border:1px solid #444;background:#222;color:var(--text);font-size:16px;width:100%;
+  touch-action:manipulation}
 input:focus{outline:2px solid var(--accent);border-color:transparent}
 
-/* ---- Screens ---- */
-.screen{display:none;flex-direction:column;height:100%;width:100%;position:absolute;top:0;left:0}
-.screen.active{display:flex}
+/* ---- Screens with fade transitions ---- */
+.screen{display:none;flex-direction:column;height:100%;width:100%;position:absolute;top:0;left:0;
+  opacity:0;transition:opacity .3s ease}
+.screen.active{display:flex;opacity:1}
+.screen.fading-out{opacity:0}
+.screen.fading-in{display:flex;opacity:0}
 
 /* ---- Landing ---- */
-#landing{justify-content:center;align-items:center;gap:16px;padding:20px}
-#landing h1{font-size:28px;text-align:center}
-#landing .sub{color:var(--muted);font-size:13px;margin-bottom:8px}
-#landing .group{display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px}
+#landing{justify-content:center;align-items:center;gap:18px;
+  padding:20px;padding-top:calc(20px + var(--safe-top));padding-bottom:calc(20px + var(--safe-bottom))}
+#landing h1{font-size:28px;text-align:center;background:linear-gradient(135deg,var(--accent),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#landing .sub{color:var(--muted);font-size:14px;margin-bottom:8px}
+#landing .group{display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px}
 #landing .row{display:flex;gap:8px}
 #landing .row input{flex:1}
 .btn-primary{background:var(--accent);color:#fff;font-weight:600}
 .btn-secondary{background:#333;color:#ccc}
-.btn-small{padding:6px 10px;font-size:12px}
+.btn-small{padding:8px 12px;font-size:13px}
 
 /* Settings gear */
-#settingsBtn{position:absolute;top:12px;right:12px;background:none;color:var(--muted);font-size:22px;padding:4px}
-#settingsModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:999;display:none;justify-content:center;align-items:center}
+#settingsBtn{position:absolute;top:calc(12px + var(--safe-top));right:calc(12px + var(--safe-right));
+  background:none;color:var(--muted);font-size:22px;padding:4px}
+#settingsModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:999;
+  display:none;justify-content:center;align-items:center}
 #settingsModal.active{display:flex}
-#settingsModal .modal{background:var(--surface);padding:20px;border-radius:10px;width:90%;max-width:360px}
+#settingsModal .modal{background:var(--surface);padding:20px;border-radius:12px;width:90%;max-width:360px}
 #settingsModal .modal h3{margin-bottom:12px}
 #settingsModal .modal label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 #settingsModal .modal .actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
 
 /* ---- Lobby ---- */
-#lobby{justify-content:center;align-items:center;gap:16px;padding:20px}
+#lobby{justify-content:center;align-items:center;gap:16px;
+  padding:20px;padding-top:calc(20px + var(--safe-top))}
 #lobby .room-code-wrapper{display:flex;align-items:center;gap:12px;justify-content:center}
-#lobby .room-code{font-size:24px;font-weight:800;letter-spacing:8px;color:var(--accent);text-shadow:0 0 20px rgba(233,69,96,.3);font-family:'Courier New',Consolas,monospace}
-#lobby .copy-btn{background:rgba(233,69,96,.15);color:var(--accent);border:1px solid rgba(233,69,96,.3);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:background .2s,color .2s}
+#lobby .room-code{font-size:28px;font-weight:800;letter-spacing:8px;color:var(--accent);
+  text-shadow:0 0 20px rgba(233,69,96,.3);font-family:'Courier New',Consolas,monospace}
+#lobby .copy-btn{background:rgba(233,69,96,.15);color:var(--accent);border:1px solid rgba(233,69,96,.3);
+  border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:background .2s,color .2s}
 #lobby .copy-btn:hover{background:rgba(233,69,96,.3)}
 #lobby .copy-btn.copied{background:var(--success);color:#fff;border-color:var(--success)}
-#lobby .player-list{list-style:none;width:100%;max-width:320px}
-#lobby .player-list li{padding:10px;background:var(--surface);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+#lobby .player-list{list-style:none;width:100%;max-width:340px}
+#lobby .player-list li{padding:12px;background:var(--surface);border-radius:8px;margin-bottom:6px;
+  display:flex;align-items:center;gap:8px;font-size:15px}
 #lobby .player-list .host-badge{font-size:10px;background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-weight:700}
 
-/* ---- Game Screen ---- */
-#game{flex-direction:column;overflow:hidden}
+/* ============================================================
+   GAME SCREEN — Portrait phone layout
+   ============================================================ */
+#game{display:none;flex-direction:column;overflow:hidden;height:100%;position:relative}
+#game.active{display:flex;opacity:1}
 
-/* Top bar */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface);font-size:13px;flex-shrink:0;border-bottom:1px solid #333}
-.top-bar .turn-info{font-weight:600}
-.top-bar .actions-left{color:var(--warn)}
-.top-bar .pile-info{color:var(--muted);font-size:12px}
+/* Top bar — fixed */
+.top-bar{display:flex;align-items:center;justify-content:space-between;
+  padding:6px 12px;padding-top:calc(6px + var(--safe-top));
+  background:var(--surface);font-size:13px;flex-shrink:0;border-bottom:1px solid #333;z-index:10}
+.top-bar .turn-info{font-weight:700;font-size:14px}
+.top-bar .turn-info.my-turn{color:var(--teal)}
+.top-bar .actions-left{color:var(--warn);font-weight:600}
+.top-bar .pile-info{color:var(--muted);font-size:11px}
+
+/* Scrollable middle */
+.game-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain}
 
 /* Opponents strip */
-.opponents{display:flex;gap:6px;padding:6px 10px;overflow-x:auto;flex-shrink:0;background:rgba(0,0,0,.2)}
-.opp-card{background:var(--surface);border-radius:8px;padding:8px;min-width:140px;flex-shrink:0;font-size:11px;border:2px solid transparent}
-.opp-card.is-turn{border-color:var(--accent)}
+.opponents{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;flex-shrink:0;
+  background:rgba(0,0,0,.2);-webkit-overflow-scrolling:touch}
+.opponents::-webkit-scrollbar{display:none}
+.opp-card{background:var(--surface);border-radius:10px;padding:10px;min-width:130px;flex-shrink:0;
+  font-size:11px;border:2px solid transparent;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.opp-card.is-turn{border-color:var(--teal);box-shadow:0 0 12px rgba(46,209,192,.2)}
 .opp-card .opp-name{font-weight:700;font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .opp-card .opp-hand{color:var(--muted)}
 .opp-card .opp-bank{color:var(--success);font-size:11px}
-.opp-props{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
-.opp-prop-dot{width:14px;height:14px;border-radius:3px;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.2)}
+.opp-props{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.opp-prop-dot{width:16px;height:16px;border-radius:4px;font-size:8px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.2)}
 .opp-prop-dot.complete{border:2px solid var(--success)}
 
-/* Main play area */
-.play-area{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
-
-/* My properties + bank */
-.my-board{display:flex;flex-direction:column;gap:6px;padding:8px 10px;overflow-y:auto;flex:1}
-.board-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+/* My board sections */
+.my-board{display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.board-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
 .prop-groups{display:flex;flex-wrap:wrap;gap:6px}
-.prop-group{background:var(--surface);border-radius:6px;padding:6px 8px;border-left:4px solid;min-width:120px}
+.prop-group{background:var(--surface);border-radius:8px;padding:8px 10px;border-left:4px solid;min-width:120px;flex:1;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
 .prop-group .pg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .prop-group .pg-color{font-size:11px;font-weight:700;text-transform:capitalize}
 .prop-group .pg-count{font-size:10px;color:var(--muted)}
@@ -101,110 +132,218 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 .prop-group .pg-cards{display:flex;flex-direction:column;gap:2px}
 .prop-group .pg-card{font-size:11px;padding:2px 4px;background:rgba(255,255,255,.05);border-radius:3px;cursor:default}
 .prop-group .pg-bonus{font-size:10px;color:var(--warn)}
-.bank-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.bank-card{background:var(--surface);padding:4px 8px;border-radius:4px;font-size:12px;color:var(--success)}
-.bank-total{font-size:13px;font-weight:700;color:var(--success);margin-left:auto}
+.bank-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bank-card{background:var(--surface);padding:6px 10px;border-radius:6px;font-size:13px;color:var(--success);
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+.bank-total{font-size:14px;font-weight:700;color:var(--success);margin-left:auto}
 
-/* Hand */
-.hand-area{flex-shrink:0;background:var(--surface);border-top:2px solid #333;padding:8px 10px 12px}
-.hand-label{font-size:11px;color:var(--muted);margin-bottom:4px}
-.hand-cards{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
-.hand-card{position:relative;border:2px solid rgba(255,255,255,.15);border-radius:8px;padding:22px 6px 6px;min-width:70px;max-width:90px;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s,box-shadow .15s;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center;min-height:95px}
-.hand-card:hover{transform:scale(1.05);box-shadow:0 4px 16px rgba(255,255,255,.15)}
-.hand-card.selected{border-color:var(--accent);transform:translateY(-8px);box-shadow:0 6px 20px rgba(233,69,96,.3)}
-.hand-card .hc-badge{position:absolute;top:3px;left:3px;background:rgba(0,0,0,.45);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;line-height:1.2}
-.hand-card .hc-name{font-weight:600;font-size:11px;word-break:break-word;flex:1;display:flex;align-items:center;text-shadow:0 1px 2px rgba(0,0,0,.4)}
-.hand-card .hc-type{font-size:8px;text-transform:uppercase;opacity:.85;margin-top:auto;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+/* Empty states */
+.empty-state{color:var(--muted);font-size:13px;padding:16px 0;text-align:center;font-style:italic}
 
-/* End turn btn */
-.hand-actions{display:flex;gap:6px;margin-top:6px;align-items:center}
-.hand-actions .act-remain{font-size:12px;color:var(--warn)}
+/* Log toggle */
+.log-toggle{position:absolute;top:calc(42px + var(--safe-top));right:calc(4px + var(--safe-right));
+  z-index:51;background:none;color:var(--muted);font-size:18px;padding:4px 8px}
+#actionLog{position:absolute;top:calc(40px + var(--safe-top));right:0;width:240px;max-height:50%;
+  overflow-y:auto;background:rgba(22,33,62,.95);border-radius:0 0 0 10px;font-size:11px;z-index:50;display:none;padding:8px}
+#actionLog.active{display:block}
+#actionLog .log-entry{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted)}
+#actionLog .log-entry:last-child{border-bottom:none}
 
-/* ---- Context Menu ---- */
-#contextMenu{position:fixed;z-index:100;background:var(--surface);border:1px solid #444;border-radius:8px;padding:6px 0;min-width:180px;max-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
-#contextMenu.active{display:block}
-#contextMenu .cm-item{padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px}
-#contextMenu .cm-item:hover{background:rgba(255,255,255,.08)}
-#contextMenu .cm-divider{height:1px;background:#333;margin:4px 0}
+/* ============================================================
+   HAND — Fixed bottom bar
+   ============================================================ */
+.hand-area{flex-shrink:0;background:var(--surface);
+  border-top:2px solid #333;padding:8px 12px;
+  padding-bottom:calc(10px + var(--safe-bottom));z-index:10}
+.hand-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.hand-label{font-size:12px;color:var(--muted)}
+.hand-actions{display:flex;gap:8px;align-items:center}
+.hand-actions .act-remain{font-size:12px;color:var(--warn);font-weight:600}
+.hand-cards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.hand-cards::-webkit-scrollbar{display:none}
+.hand-card{position:relative;border:2px solid rgba(255,255,255,.15);border-radius:10px;
+  padding:22px 6px 8px;min-width:68px;max-width:88px;cursor:pointer;flex-shrink:0;
+  transition:transform .2s ease,border-color .2s,box-shadow .2s;font-size:11px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center;min-height:96px;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+.hand-card:active{transform:scale(.95)}
+.hand-card.selected{border-color:var(--teal);transform:translateY(-6px) scale(1.05);
+  box-shadow:0 6px 24px rgba(46,209,192,.35)}
+.hand-card .hc-badge{position:absolute;top:3px;left:3px;background:rgba(0,0,0,.45);color:#fff;
+  font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;line-height:1.2}
+.hand-card .hc-name{font-weight:600;font-size:11px;word-break:break-word;flex:1;display:flex;align-items:center;
+  text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.hand-card .hc-type{font-size:8px;text-transform:uppercase;opacity:.85;margin-top:auto;
+  text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
-/* ---- Picker Modal ---- */
-#pickerModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:200;display:none;justify-content:center;align-items:flex-end}
-#pickerModal.active{display:flex}
-#pickerModal .modal{background:var(--surface);border-radius:12px 12px 0 0;width:100%;max-width:480px;max-height:70vh;overflow-y:auto;padding:16px}
-#pickerModal .modal h3{margin-bottom:12px;font-size:16px}
+/* Breathing animation for waiting state */
+.hand-area.waiting{animation:breathe 3s ease-in-out infinite}
+@keyframes breathe{0%,100%{background:var(--surface)}50%{background:#1a2744}}
+
+/* ============================================================
+   ACTION PANEL — iOS-style slide-up action sheet
+   ============================================================ */
+#actionPanelOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);
+  z-index:400;display:none;opacity:0;transition:opacity .25s ease}
+#actionPanelOverlay.active{display:block;opacity:1}
+#actionPanel{position:fixed;bottom:0;left:0;width:100%;z-index:401;
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+  padding:0 8px;padding-bottom:calc(8px + var(--safe-bottom))}
+#actionPanel.active{transform:translateY(0)}
+.ap-sheet{background:var(--surface);border-radius:14px;overflow:hidden;margin-bottom:8px}
+.ap-header{padding:14px 16px 8px;font-size:13px;color:var(--muted);text-align:center;
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.ap-item{padding:14px 16px;font-size:16px;text-align:center;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.06);color:var(--text);transition:background .15s;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+.ap-item:last-child{border-bottom:none}
+.ap-item:active{background:rgba(255,255,255,.08)}
+.ap-item.destructive{color:var(--accent)}
+.ap-divider{height:1px;background:rgba(255,255,255,.08)}
+.ap-cancel{background:var(--surface);border-radius:14px;padding:14px 16px;font-size:16px;font-weight:600;
+  text-align:center;cursor:pointer;color:var(--teal);-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.ap-cancel:active{background:rgba(255,255,255,.08)}
+
+/* ============================================================
+   PICKER MODAL — slide-up panel
+   ============================================================ */
+#pickerModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);
+  z-index:200;display:none;justify-content:flex-end;align-items:flex-end;flex-direction:column;
+  opacity:0;transition:opacity .25s ease}
+#pickerModal.active{display:flex;opacity:1}
+#pickerModal .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:70vh;
+  overflow-y:auto;padding:16px;padding-bottom:calc(16px + var(--safe-bottom));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+#pickerModal.active .modal{transform:translateY(0)}
+#pickerModal .modal h3{margin-bottom:12px;font-size:16px;text-align:center}
 #pickerModal .pick-list{display:flex;flex-direction:column;gap:6px}
-#pickerModal .pick-item{padding:10px;background:var(--card);border-radius:6px;cursor:pointer;font-size:13px;border:2px solid transparent;transition:border-color .15s}
-#pickerModal .pick-item:hover{border-color:var(--accent)}
+#pickerModal .pick-item{padding:14px 12px;background:var(--card);border-radius:10px;cursor:pointer;font-size:15px;
+  border:2px solid transparent;transition:border-color .15s,background .15s;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+#pickerModal .pick-item:active{background:rgba(15,52,96,.7)}
 #pickerModal .pick-item.disabled{opacity:.4;cursor:not-allowed}
 #pickerModal .pick-cancel{margin-top:12px;width:100%}
 
-/* ---- Payment Modal ---- */
-#paymentModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:300;display:none;justify-content:center;align-items:center}
-#paymentModal.active{display:flex}
-#paymentModal .modal{background:var(--surface);border-radius:12px;width:92%;max-width:420px;max-height:80vh;overflow-y:auto;padding:16px}
-#paymentModal .modal h3{margin-bottom:4px}
-#paymentModal .pay-amount{font-size:20px;font-weight:700;color:var(--accent);margin-bottom:12px}
-#paymentModal .pay-section{margin-bottom:10px}
-#paymentModal .pay-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
-#paymentModal .pay-item{display:flex;align-items:center;gap:8px;padding:6px;background:var(--card);border-radius:4px;margin-bottom:4px;cursor:pointer}
-#paymentModal .pay-item input{width:16px;height:16px;accent-color:var(--accent)}
-#paymentModal .pay-item label{font-size:13px;flex:1;cursor:pointer}
-#paymentModal .pay-total{font-size:14px;font-weight:700;margin:8px 0}
-#paymentModal .pay-actions{display:flex;gap:8px}
-#paymentModal .pay-actions button{flex:1}
+/* ============================================================
+   PAYMENT MODAL — fullscreen takeover, slide-up
+   ============================================================ */
+#paymentModal{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);
+  z-index:300;display:none;flex-direction:column;
+  transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
+#paymentModal.active{display:flex;transform:translateY(0)}
+.pay-topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+  padding-top:calc(12px + var(--safe-top));background:var(--surface);border-bottom:1px solid #333}
+.pay-topbar h3{font-size:17px}
+.pay-topbar .pay-close{background:none;color:var(--muted);font-size:14px;padding:6px 10px}
+.pay-body{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.pay-amount-bar{text-align:center;padding:16px 0 20px}
+.pay-amount{font-size:32px;font-weight:800;color:var(--accent)}
+.pay-amount-label{font-size:13px;color:var(--muted);margin-top:4px}
+.pay-section{margin-bottom:16px}
+.pay-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;letter-spacing:1px}
+.pay-chip{display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface);
+  border-radius:10px;margin-bottom:6px;cursor:pointer;border:2px solid transparent;
+  transition:border-color .15s,background .15s;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+.pay-chip.selected{border-color:var(--teal);background:rgba(46,209,192,.08)}
+.pay-chip:active{background:rgba(255,255,255,.05)}
+.pay-chip-check{width:22px;height:22px;border-radius:6px;border:2px solid #555;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;transition:all .15s}
+.pay-chip.selected .pay-chip-check{border-color:var(--teal);background:var(--teal);color:#000}
+.pay-chip-label{font-size:14px;flex:1}
+.pay-chip-value{font-size:13px;color:var(--success);font-weight:600}
+.pay-footer{padding:12px 16px;padding-bottom:calc(12px + var(--safe-bottom));background:var(--surface);
+  border-top:1px solid #333;display:flex;flex-direction:column;gap:8px}
+.pay-total-bar{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:4px}
+.pay-total-bar .needed{color:var(--muted)}
+.pay-total-bar .selected-total{color:var(--teal)}
+.pay-total-bar .selected-total.enough{color:var(--success)}
+.pay-btn-row{display:flex;gap:8px}
+.pay-btn-row button{flex:1;padding:14px;font-size:16px;font-weight:600;border-radius:12px}
+#jsnPayBtn{background:var(--red);color:#fff}
 
-/* ---- Discard Modal ---- */
-#discardModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:300;display:none;justify-content:center;align-items:center}
-#discardModal.active{display:flex}
-#discardModal .modal{background:var(--surface);border-radius:12px;width:92%;max-width:420px;max-height:80vh;overflow-y:auto;padding:16px}
+/* ============================================================
+   DISCARD MODAL — slide-up panel
+   ============================================================ */
+#discardModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);
+  z-index:300;display:none;justify-content:flex-end;align-items:flex-end;flex-direction:column;
+  opacity:0;transition:opacity .25s ease}
+#discardModal.active{display:flex;opacity:1}
+#discardModal .modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:80vh;
+  overflow-y:auto;padding:16px;padding-bottom:calc(16px + var(--safe-bottom));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+#discardModal.active .modal{transform:translateY(0)}
 
 /* ---- JSN Chain Modal ---- */
-#jsnModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:300;display:none;justify-content:center;align-items:center}
+#jsnModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);
+  z-index:300;display:none;justify-content:center;align-items:center}
 #jsnModal.active{display:flex}
-#jsnModal .modal{background:var(--surface);border-radius:12px;width:92%;max-width:380px;padding:16px}
-#jsnModal .chain-history{margin:12px 0;font-size:13px}
-#jsnModal .chain-entry{padding:4px 0;border-bottom:1px solid #333}
+#jsnModal .modal{background:var(--surface);border-radius:14px;width:92%;max-width:380px;padding:20px}
+#jsnModal .chain-history{margin:12px 0;font-size:14px}
+#jsnModal .chain-entry{padding:6px 0;border-bottom:1px solid #333}
 
-/* ---- Action Log ---- */
-#actionLog{position:absolute;top:40px;right:0;width:240px;max-height:60%;overflow-y:auto;background:rgba(22,33,62,.92);border-radius:0 0 0 8px;font-size:11px;z-index:50;display:none;padding:6px}
-#actionLog.active{display:block}
-#actionLog .log-entry{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted)}
-#actionLog .log-entry:last-child{border-bottom:none}
-.log-toggle{position:absolute;top:42px;right:4px;z-index:51;background:none;color:var(--muted);font-size:18px;padding:2px 6px}
+/* ============================================================
+   VISUAL FEEDBACK
+   ============================================================ */
+
+/* Your-turn pulse — teal border on the whole game screen */
+#game.your-turn::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;z-index:5;border:2px solid var(--teal);
+  animation:turnBorderPulse 2s ease-in-out infinite;border-radius:0}
+@keyframes turnBorderPulse{
+  0%,100%{border-color:rgba(46,209,192,.15);box-shadow:inset 0 0 8px rgba(46,209,192,.05)}
+  50%{border-color:rgba(46,209,192,.6);box-shadow:inset 0 0 20px rgba(46,209,192,.1)}}
+
+/* Targeted flash — red overlay */
+#targetedFlash{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(217,37,37,.2);
+  pointer-events:none;z-index:450;opacity:0;transition:opacity .15s}
+#targetedFlash.active{animation:targetFlash .6s ease}
+@keyframes targetFlash{0%{opacity:1}100%{opacity:0}}
+
+/* Card fly animation */
+.hand-card.flying{position:fixed!important;z-index:999;transition:all .4s cubic-bezier(.32,.72,0,1)}
+
+/* ---- Toast — slides from top ---- */
+#toast{position:fixed;top:calc(-60px);left:50%;transform:translateX(-50%);
+  background:var(--surface);color:#fff;padding:10px 20px;border-radius:12px;font-size:14px;
+  z-index:500;white-space:nowrap;border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);transition:top .3s cubic-bezier(.32,.72,0,1);
+  max-width:90%}
+#toast.active{top:calc(12px + var(--safe-top))}
+
+/* Action toast — opponent actions, slides from top */
+#actionToast{position:fixed;top:calc(-60px);right:12px;
+  background:rgba(22,33,62,.95);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;
+  z-index:500;white-space:nowrap;border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 4px 16px rgba(0,0,0,.4);transition:top .3s cubic-bezier(.32,.72,0,1);max-width:80%}
+#actionToast.active{top:calc(12px + var(--safe-top))}
+
+/* Connection Status */
+#connStatus{position:fixed;top:0;left:0;width:100%;background:var(--accent);color:#fff;text-align:center;
+  padding:4px;padding-top:calc(4px + var(--safe-top));font-size:12px;z-index:600;
+  transform:translateY(-100%);transition:transform .3s ease}
+#connStatus.active{transform:translateY(0)}
 
 /* ---- Game Over ---- */
-#gameOver{justify-content:center;align-items:center;gap:16px;padding:20px;text-align:center}
+#gameOver{justify-content:center;align-items:center;gap:16px;padding:20px;text-align:center;
+  padding-top:calc(20px + var(--safe-top))}
 #gameOver h1{font-size:32px;color:var(--success)}
 #gameOver .winner-sets{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
 
-/* ---- Toast ---- */
-#toast{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;z-index:500;display:none;white-space:nowrap}
-#toast.active{display:block;animation:fadeInOut 3s ease forwards}
-@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(10px)}10%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0}}
-
-/* ---- Connection Status ---- */
-#connStatus{position:fixed;top:0;left:0;width:100%;background:var(--accent);color:#fff;text-align:center;padding:4px;font-size:12px;z-index:600;display:none}
-#connStatus.active{display:block}
-
-/* ---- Your Turn Pulse ---- */
-.play-area.your-turn{animation:turnPulse 2s ease-in-out infinite;border:2px solid transparent}
-@keyframes turnPulse{0%,100%{border-color:rgba(0,210,190,.2);box-shadow:inset 0 0 8px rgba(0,210,190,.08)}50%{border-color:rgba(0,210,190,.7);box-shadow:inset 0 0 16px rgba(0,210,190,.15)}}
-
-/* ---- Action Toast ---- */
-#actionToast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(22,33,62,.92);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:500;display:none;white-space:nowrap;border:1px solid rgba(255,255,255,.15);box-shadow:0 4px 12px rgba(0,0,0,.4)}
-#actionToast.active{display:block;animation:toastSlide 3s ease forwards}
-@keyframes toastSlide{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}10%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0}}
-
-/* ---- Mobile ---- */
-@media(max-width:400px){
-  .hand-card{min-width:56px;max-width:72px;min-height:78px;padding:18px 4px 4px;font-size:10px}
+/* ---- Mobile-specific (small phones) ---- */
+@media(max-width:374px){
+  .hand-card{min-width:60px;max-width:75px;min-height:88px;padding:20px 4px 6px;font-size:10px}
   .hand-card .hc-name{font-size:9px}
   .hand-card .hc-badge{font-size:8px}
-  .hand-card .hc-type{font-size:7px}
+  .opp-card{min-width:110px;padding:8px}
 }
 </style>
 </head>
 <body>
+
+<!-- Targeted Flash Overlay -->
+<div id="targetedFlash"></div>
 
 <!-- Connection Status Banner -->
 <div id="connStatus">Reconnecting...</div>
@@ -215,7 +354,7 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 
 <!-- ============ LANDING ============ -->
 <div id="landing" class="screen active">
-  <h1>Monopoly Deal Online</h1>
+  <h1>Property Deal</h1>
   <p class="sub">Real-time multiplayer card game</p>
   <div class="group">
     <input id="nameInput" placeholder="Your name" maxlength="20" autocomplete="off">
@@ -256,22 +395,19 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
 
 <!-- ============ GAME ============ -->
 <div id="game" class="screen">
-  <!-- Top Bar -->
+  <!-- Top Bar — fixed -->
   <div class="top-bar">
     <span class="turn-info" id="turnInfo">Turn 1</span>
     <span class="actions-left" id="actionsLeft">3 actions left</span>
-    <span class="pile-info" id="pileInfo">Deck: 0 | Discard: -</span>
+    <span class="pile-info" id="pileInfo">Deck: 0</span>
   </div>
 
-  <!-- Opponents -->
-  <div class="opponents" id="opponentsStrip"></div>
+  <!-- Scrollable middle -->
+  <div class="game-scroll">
+    <!-- Opponents -->
+    <div class="opponents" id="opponentsStrip"></div>
 
-  <!-- Log Toggle -->
-  <button class="log-toggle" onclick="toggleLog()" title="Action log">&#9776;</button>
-  <div id="actionLog"></div>
-
-  <!-- Play Area -->
-  <div class="play-area">
+    <!-- My Board -->
     <div class="my-board" id="myBoard">
       <div class="board-section-title">Your Properties</div>
       <div class="prop-groups" id="myProps"></div>
@@ -280,31 +416,62 @@ input:focus{outline:2px solid var(--accent);border-color:transparent}
     </div>
   </div>
 
-  <!-- Hand -->
-  <div class="hand-area">
-    <div class="hand-label" id="handLabel">Your hand (0)</div>
-    <div class="hand-cards" id="handCards"></div>
-    <div class="hand-actions">
-      <span class="act-remain" id="actRemain"></span>
-      <button class="btn-primary btn-small" id="endTurnBtn" onclick="endTurn()">End Turn</button>
+  <!-- Log Toggle -->
+  <button class="log-toggle" onclick="toggleLog()" title="Action log">&#9776;</button>
+  <div id="actionLog"></div>
+
+  <!-- Hand — fixed bottom -->
+  <div class="hand-area" id="handArea">
+    <div class="hand-header">
+      <span class="hand-label" id="handLabel">Your hand (0)</span>
+      <div class="hand-actions">
+        <span class="act-remain" id="actRemain"></span>
+        <button class="btn-primary btn-small" id="endTurnBtn" onclick="endTurn()">End Turn</button>
+      </div>
     </div>
+    <div class="hand-cards" id="handCards"></div>
   </div>
 </div>
 
-<!-- Context Menu -->
-<div id="contextMenu"></div>
+<!-- Action Panel (iOS-style action sheet) -->
+<div id="actionPanelOverlay" onclick="closeActionPanel()"></div>
+<div id="actionPanel">
+  <div class="ap-sheet" id="actionPanelSheet"></div>
+  <div class="ap-cancel" onclick="closeActionPanel()">Cancel</div>
+</div>
 
 <!-- Picker Modal -->
 <div id="pickerModal"><div class="modal"><h3 id="pickerTitle">Choose</h3><div class="pick-list" id="pickList"></div><button class="btn-secondary pick-cancel" onclick="closePicker()">Cancel</button></div></div>
 
-<!-- Payment Modal -->
-<div id="paymentModal"><div class="modal"><h3>Payment Required</h3><div class="pay-amount" id="payAmount">$0M</div><div id="payItems"></div><div class="pay-total" id="payTotal">Selected: $0M</div><div class="pay-actions"><button class="btn-primary" id="payBtn" onclick="submitPayment()">Pay</button><button class="btn-secondary" id="jsnPayBtn" onclick="playJSNFromPayment()" style="display:none">Just Say No</button></div></div></div>
+<!-- Payment Modal — fullscreen -->
+<div id="paymentModal">
+  <div class="pay-topbar">
+    <h3>Payment Required</h3>
+  </div>
+  <div class="pay-body">
+    <div class="pay-amount-bar">
+      <div class="pay-amount" id="payAmount">$0M</div>
+      <div class="pay-amount-label">owed</div>
+    </div>
+    <div id="payItems"></div>
+  </div>
+  <div class="pay-footer">
+    <div class="pay-total-bar">
+      <span class="needed" id="payNeeded">Needed: $0M</span>
+      <span class="selected-total" id="paySelected">Selected: $0M</span>
+    </div>
+    <div class="pay-btn-row">
+      <button class="btn-primary" id="payBtn" onclick="submitPayment()">Pay</button>
+      <button id="jsnPayBtn" onclick="playJSNFromPayment()" style="display:none">Just Say No!</button>
+    </div>
+  </div>
+</div>
 
 <!-- Discard Modal -->
 <div id="discardModal"><div class="modal"><h3>Discard to 7 cards</h3><p class="sub" id="discardInfo">Select cards to discard</p><div id="discardItems"></div><button class="btn-primary" style="margin-top:12px;width:100%" id="discardBtn" onclick="submitDiscard()">Discard</button></div></div>
 
 <!-- JSN Chain Modal -->
-<div id="jsnModal"><div class="modal"><h3>Just Say No!</h3><div class="chain-history" id="jsnChain"></div><div class="pay-actions"><button class="btn-primary" id="jsnCounterBtn" onclick="counterJSN()">Counter with Just Say No</button><button class="btn-secondary" onclick="acceptJSN()">Accept</button></div></div></div>
+<div id="jsnModal"><div class="modal"><h3>Just Say No!</h3><div class="chain-history" id="jsnChain"></div><div class="pay-btn-row" style="margin-top:12px"><button class="btn-primary" id="jsnCounterBtn" onclick="counterJSN()" style="flex:1">Counter with Just Say No</button><button class="btn-secondary" onclick="acceptJSN()" style="flex:1">Accept</button></div></div></div>
 
 <!-- ============ GAME OVER ============ -->
 <div id="gameOver" class="screen">
@@ -323,7 +490,7 @@ let myPlayerId = null;
 let mySessionToken = null;
 let roomCode = null;
 let hostId = null;
-let gameState = null;      // ClientGameState
+let gameState = null;
 let selectedCardId = null;
 let actionLogs = [];
 let reconnectTimer = null;
@@ -370,11 +537,26 @@ function saveSettings() {
 }
 
 // ============================================================
-// SCREENS
+// SCREENS — smooth fade transitions
 // ============================================================
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const current = document.querySelector('.screen.active');
+  const next = document.getElementById(id);
+  if (current === next) return;
+
+  if (current) {
+    current.classList.add('fading-out');
+    setTimeout(() => {
+      current.classList.remove('active', 'fading-out');
+      next.classList.add('fading-in');
+      // Force reflow then fade in
+      void next.offsetWidth;
+      next.classList.add('active');
+      next.classList.remove('fading-in');
+    }, 200);
+  } else {
+    next.classList.add('active');
+  }
 }
 
 // ============================================================
@@ -389,9 +571,7 @@ function connect() {
     document.getElementById('connStatus').classList.remove('active');
   };
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-  ws.onclose = () => {
-    scheduleReconnect();
-  };
+  ws.onclose = () => { scheduleReconnect(); };
   ws.onerror = () => {};
 }
 
@@ -409,6 +589,17 @@ function scheduleReconnect() {
 function send(type, payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) { toast('Not connected'); return; }
   ws.send(JSON.stringify({ type, payload }));
+}
+
+// ============================================================
+// HAPTIC FEEDBACK
+// ============================================================
+function haptic(pattern) {
+  if (navigator.vibrate) {
+    if (pattern === 'light') navigator.vibrate(10);
+    else if (pattern === 'medium') navigator.vibrate(25);
+    else if (pattern === 'heavy') navigator.vibrate([30, 20, 30]);
+  }
 }
 
 // ============================================================
@@ -448,6 +639,7 @@ function handleMessage(msg) {
       break;
     case 'action_rejected':
       toast('Rejected: ' + msg.payload.reason);
+      haptic('heavy');
       break;
     case 'game_over':
       showGameOver(msg.payload);
@@ -530,13 +722,14 @@ function renderLobby(room) {
 function renderGame() {
   if (!gameState) return;
   const gs = gameState;
-  const me = gs.you;
-  const isMyTurn = gs.currentPlayerIndex === getAllPlayersOrdered().findIndex(p => p.id === myPlayerId);
+  const myTurn = isMyTurn();
 
   // Top bar
   const currentPlayerName = getCurrentTurnPlayerName();
-  document.getElementById('turnInfo').textContent = `Turn ${gs.turnNumber} — ${isMyTurn ? 'Your turn' : currentPlayerName + "'s turn"}`;
-  document.getElementById('actionsLeft').textContent = isMyTurn ? `${gs.actionsRemaining} action${gs.actionsRemaining !== 1 ? 's' : ''} left` : '';
+  const turnInfoEl = document.getElementById('turnInfo');
+  turnInfoEl.textContent = `Turn ${gs.turnNumber} — ${myTurn ? 'Your turn' : currentPlayerName + "'s turn"}`;
+  turnInfoEl.className = 'turn-info' + (myTurn ? ' my-turn' : '');
+  document.getElementById('actionsLeft').textContent = myTurn ? `${gs.actionsRemaining} action${gs.actionsRemaining !== 1 ? 's' : ''} left` : '';
   const discardName = gs.discardPileTop ? gs.discardPileTop.name : '-';
   document.getElementById('pileInfo').textContent = `Deck: ${gs.drawPileCount} | Discard: ${discardName}`;
 
@@ -554,13 +747,18 @@ function renderGame() {
 
   // End turn button
   const endBtn = document.getElementById('endTurnBtn');
-  endBtn.style.display = isMyTurn && gs.phase === 'play' ? '' : 'none';
-  document.getElementById('actRemain').textContent = isMyTurn ? `${gs.actionsRemaining}/3 actions` : '';
+  endBtn.style.display = myTurn && gs.phase === 'play' ? '' : 'none';
+  document.getElementById('actRemain').textContent = myTurn ? `${gs.actionsRemaining}/3` : '';
 
-  // Your-turn indicator
-  const playArea = document.querySelector('.play-area');
-  if (isMyTurn && gs.phase === 'play') playArea.classList.add('your-turn');
-  else playArea.classList.remove('your-turn');
+  // Your-turn indicator on game screen border
+  const gameEl = document.getElementById('game');
+  if (myTurn && gs.phase === 'play') gameEl.classList.add('your-turn');
+  else gameEl.classList.remove('your-turn');
+
+  // Hand breathing animation when waiting
+  const handArea = document.getElementById('handArea');
+  if (!myTurn) handArea.classList.add('waiting');
+  else handArea.classList.remove('waiting');
 
   // Payment modal
   if (gs.phase === 'awaiting_response' && gs.pendingAction) {
@@ -568,83 +766,27 @@ function renderGame() {
   }
 
   // Discard phase
-  if (gs.phase === 'discard' && isMyTurn) {
+  if (gs.phase === 'discard' && myTurn) {
     showDiscardModal();
   }
 }
 
 function getAllPlayersOrdered() {
-  // Reconstruct full player order: place 'you' in correct spot based on opponents
-  // The server sends currentPlayerIndex relative to the full players array
-  // We don't know our exact index, but we can infer:
-  // In the original state, players = [p0, p1, p2, ...]. 'you' is one of them.
-  // opponents are in order excluding you.
-  // We need to figure out where 'you' fits.
-  // Actually, the server gives us you + opponents. The original order is preserved.
-  // Let's reconstruct: we know you.id and opponents[].id
-  // The simplest approach: build a combined list sorted by their original indices.
-  // We don't have original indices directly, but the server preserves order.
-  // The 'you' player was at some index, opponents fill the rest in order.
-
-  // For turn display purposes, let's just build [you, ...opponents] and find current by ID
-  // Actually we need the real order for currentPlayerIndex. Let me think...
-  // currentPlayerIndex refers to the original players array. We have all IDs.
-  // We need to know the original order.
-  // Looking at GameRoom.filterStateForPlayer: it builds opponents by filtering players.
-  // So opponent order matches the original player order (minus you).
-  // We can reconstruct: insert 'you' at the position that makes currentPlayerIndex correct.
-
-  // But we don't know our original index... we can figure it out though.
-  // Total players = 1 + opponents.length. Let's try each possible index for 'you'.
-  // Actually, a simpler way: if it's our turn, currentPlayerIndex points to us.
-  // Let's just build a list and use it for display.
-
   if (!gameState) return [];
-  const all = [];
-  let oppIdx = 0;
-  const totalPlayers = 1 + gameState.opponents.length;
-  // We need to figure out our index in the original array.
-  // The opponents are in original order minus us. So if we're at index i,
-  // opponents[0..i-1] are players[0..i-1], opponents[i..] are players[i+1..].
-  // We can try: if currentPlayerIndex is us, we know our index. But if it's not our turn...
-  // Let's just cache our index when we know it, or brute-force it.
-
-  // Simple approach: build combined by just putting us in each slot and checking
-  // which arrangement makes the currentPlayerIndex point to the right player.
-  // For now, let's do it the simple way: just return a flat list for display.
   return [gameState.you, ...gameState.opponents];
 }
 
 function getCurrentTurnPlayerName() {
   if (!gameState) return '?';
-  const allPlayers = [gameState.you, ...gameState.opponents];
-  // We need to map currentPlayerIndex to a player name.
-  // The issue is we don't know our original index.
-  // Let's figure out our index: total players = allPlayers.length
-  // originalPlayers = players in server order. We = one of them.
-  // Opponents are in server order minus us.
-  // If our original index is X, then:
-  //   for i < X: opponents[i] = originalPlayers[i]
-  //   for i > X: opponents[i-1] = originalPlayers[i]
-  // So opponent count before us = X opponents, after us = total-X-1.
-  // We can find our index by: checking who is current player.
-  // But that's circular. Let's just try all positions.
-
   const opps = gameState.opponents;
   const totalP = opps.length + 1;
-  // Try each position for ourselves
   for (let myIdx = 0; myIdx < totalP; myIdx++) {
-    // Build original array with us at myIdx
     const test = [];
     let oi = 0;
     for (let i = 0; i < totalP; i++) {
       if (i === myIdx) test.push(gameState.you);
       else test.push(opps[oi++]);
     }
-    // Check: the player at currentPlayerIndex should have the right id
-    // We don't know which is "right" unless we try all. But we DO know
-    // that the order of opponents must match the filtered order.
-    // This test checks consistency: the non-you players in order should match opponents.
     let consistent = true;
     let oi2 = 0;
     for (let i = 0; i < totalP; i++) {
@@ -662,7 +804,6 @@ function getCurrentTurnPlayerName() {
 
 function isMyTurn() {
   if (!gameState) return false;
-  // Figure out if currentPlayerIndex points to us
   return getCurrentTurnPlayerName() === gameState.you.name;
 }
 
@@ -702,7 +843,7 @@ function renderMyProperties() {
   if (!gameState) return;
   const me = gameState.you;
   if (me.properties.length === 0) {
-    container.innerHTML = '<span style="color:var(--muted);font-size:12px">No properties yet</span>';
+    container.innerHTML = '<div class="empty-state">Play property cards to start building sets</div>';
     return;
   }
   me.properties.forEach(g => {
@@ -731,7 +872,7 @@ function renderMyBank() {
   if (!gameState) return;
   const me = gameState.you;
   if (me.bank.length === 0) {
-    container.innerHTML = '<span style="color:var(--muted);font-size:12px">Empty</span>';
+    container.innerHTML = '<div class="empty-state">Bank money to build your fortune</div>';
     return;
   }
   me.bank.forEach(c => {
@@ -822,10 +963,10 @@ function getCardTextColor(card) {
 }
 
 // ============================================================
-// CARD CLICK / CONTEXT MENU
+// CARD CLICK — open action panel
 // ============================================================
 function onCardClick(card, el) {
-  closeContextMenu();
+  closeActionPanel();
   if (!isMyTurn() || gameState.phase !== 'play') {
     toast("Not your turn");
     return;
@@ -835,130 +976,191 @@ function onCardClick(card, el) {
     return;
   }
   selectedCardId = card.id;
-  renderHand(); // re-render to show selection
-  showContextMenu(card, el);
+  renderHand();
+  haptic('light');
+  showActionPanel(card, el);
 }
 
-function showContextMenu(card, anchorEl) {
-  const menu = document.getElementById('contextMenu');
-  menu.innerHTML = '';
+// ============================================================
+// ACTION PANEL — iOS-style action sheet
+// ============================================================
+function showActionPanel(card, anchorEl) {
+  const sheet = document.getElementById('actionPanelSheet');
+  sheet.innerHTML = '';
   const items = getActionsForCard(card);
-  items.forEach((item, i) => {
+
+  // Header with card name
+  const header = document.createElement('div');
+  header.className = 'ap-header';
+  header.textContent = card.name;
+  sheet.appendChild(header);
+
+  items.forEach(item => {
     if (item.divider) {
       const d = document.createElement('div');
-      d.className = 'cm-divider';
-      menu.appendChild(d);
+      d.className = 'ap-divider';
+      sheet.appendChild(d);
       return;
     }
     const div = document.createElement('div');
-    div.className = 'cm-item';
+    div.className = 'ap-item';
     div.textContent = item.label;
     div.addEventListener('click', () => {
-      closeContextMenu();
-      item.action();
+      closeActionPanel();
+      haptic('medium');
+      // Fly animation for direct play actions
+      if (item.flies && anchorEl) {
+        flyCard(anchorEl, () => item.action());
+      } else {
+        item.action();
+      }
     });
-    menu.appendChild(div);
+    sheet.appendChild(div);
   });
 
-  // Position near the card
-  const rect = anchorEl.getBoundingClientRect();
-  menu.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
-  menu.style.top = (rect.top - items.length * 36 - 10) + 'px';
-  if (parseInt(menu.style.top) < 10) menu.style.top = (rect.bottom + 5) + 'px';
-  menu.classList.add('active');
-
-  // Close on outside click
-  setTimeout(() => document.addEventListener('click', closeContextMenu, { once: true }), 50);
+  document.getElementById('actionPanelOverlay').classList.add('active');
+  // Small delay for slide-up transition
+  requestAnimationFrame(() => {
+    document.getElementById('actionPanel').classList.add('active');
+  });
 }
 
-function closeContextMenu() {
-  document.getElementById('contextMenu').classList.remove('active');
+function closeActionPanel() {
+  document.getElementById('actionPanel').classList.remove('active');
+  document.getElementById('actionPanelOverlay').classList.remove('active');
+  selectedCardId = null;
+  renderHand();
 }
 
+// ============================================================
+// CARD FLY ANIMATION
+// ============================================================
+function flyCard(cardEl, callback) {
+  const rect = cardEl.getBoundingClientRect();
+  const clone = cardEl.cloneNode(true);
+  clone.classList.add('flying');
+  clone.style.left = rect.left + 'px';
+  clone.style.top = rect.top + 'px';
+  clone.style.width = rect.width + 'px';
+  clone.style.height = rect.height + 'px';
+  clone.style.margin = '0';
+  document.body.appendChild(clone);
+
+  // Fly to center of screen
+  requestAnimationFrame(() => {
+    const cx = window.innerWidth / 2 - rect.width / 2;
+    const cy = window.innerHeight / 2 - rect.height / 2;
+    clone.style.left = cx + 'px';
+    clone.style.top = cy + 'px';
+    clone.style.transform = 'scale(1.2)';
+    clone.style.opacity = '0.6';
+  });
+
+  setTimeout(() => {
+    clone.remove();
+    if (callback) callback();
+  }, 400);
+}
+
+// ============================================================
+// TARGETED FLASH
+// ============================================================
+function flashTargeted() {
+  const el = document.getElementById('targetedFlash');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  haptic('heavy');
+  setTimeout(() => el.classList.remove('active'), 600);
+}
+
+// ============================================================
+// CARD ACTIONS
+// ============================================================
 function getActionsForCard(card) {
   const items = [];
   const t = card.type;
 
   if (t === 'money') {
-    items.push({ label: `Bank $${card.bankValue}M`, action: () => bankMoney(card) });
+    items.push({ label: `Bank $${card.bankValue}M`, action: () => bankMoney(card), flies: true });
   }
   else if (t === 'property') {
-    items.push({ label: `Play to ${COLOR_LABELS[card.color] || card.color}`, action: () => playProperty(card, card.color) });
+    items.push({ label: `Play to ${COLOR_LABELS[card.color] || card.color}`, action: () => playProperty(card, card.color), flies: true });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'property_wild') {
-    if (card.color) items.push({ label: `Play as ${COLOR_LABELS[card.color]}`, action: () => playProperty(card, card.color) });
-    if (card.altColor) items.push({ label: `Play as ${COLOR_LABELS[card.altColor]}`, action: () => playProperty(card, card.altColor) });
+    if (card.color) items.push({ label: `Play as ${COLOR_LABELS[card.color]}`, action: () => playProperty(card, card.color), flies: true });
+    if (card.altColor) items.push({ label: `Play as ${COLOR_LABELS[card.altColor]}`, action: () => playProperty(card, card.altColor), flies: true });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'property_wild_all') {
     items.push({ label: 'Play to color...', action: () => pickColorForWild(card) });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_pass_go') {
-    items.push({ label: 'Play (draw 2)', action: () => playPassGo(card) });
+    items.push({ label: 'Play (draw 2)', action: () => playPassGo(card), flies: true });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'rent_two_color') {
     if (card.rentColors) {
       card.rentColors.forEach(c => {
-        items.push({ label: `Charge ${COLOR_LABELS[c]} rent (all)`, action: () => playRent(card, c, null) });
+        items.push({ label: `Charge ${COLOR_LABELS[c]} rent`, action: () => playRent(card, c, null), flies: true });
       });
     }
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'rent_wild') {
     items.push({ label: 'Charge rent...', action: () => pickColorThenPlayerForWildRent(card) });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_debt_collector') {
     items.push({ label: 'Play Debt Collector...', action: () => pickPlayerForAction(card, 'play_debt_collector') });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_its_my_birthday') {
-    items.push({ label: "Play It's My Birthday", action: () => playBirthday(card) });
+    items.push({ label: "Play It's My Birthday", action: () => playBirthday(card), flies: true });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_sly_deal') {
     items.push({ label: 'Play Sly Deal...', action: () => startSlyDeal(card) });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_forced_deal') {
     items.push({ label: 'Play Forced Deal...', action: () => startForcedDeal(card) });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_deal_breaker') {
     items.push({ label: 'Play Deal Breaker...', action: () => startDealBreaker(card) });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_house') {
     items.push({ label: 'Play House...', action: () => pickCompleteSetForHouseHotel(card, 'play_house') });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_hotel') {
     items.push({ label: 'Play Hotel...', action: () => pickCompleteSetForHouseHotel(card, 'play_hotel') });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_double_rent') {
-    items.push({ label: 'Play Double Rent', action: () => playDoubleRent(card) });
+    items.push({ label: 'Play Double Rent', action: () => playDoubleRent(card), flies: true });
     items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_just_say_no') {
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card) });
+    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
 
   return items;
@@ -998,7 +1200,6 @@ function pickColorForWild(card) {
 
 // ---- Wild Rent: pick color then pick player ----
 function pickColorThenPlayerForWildRent(card) {
-  // Show colors for which we have properties
   const myColors = gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color);
   if (myColors.length === 0) { toast('No properties to charge rent for'); return; }
   openPicker('Choose rent color', myColors.map(c => ({
@@ -1006,7 +1207,6 @@ function pickColorThenPlayerForWildRent(card) {
     color: COLOR_CSS[c],
     action: () => {
       closePicker();
-      // Now pick a target player
       pickPlayerForWildRent(card, c);
     }
   })));
@@ -1027,7 +1227,7 @@ function pickPlayerForAction(card, actionType) {
   })));
 }
 
-// ---- Sly Deal: pick player -> pick their property (not from complete sets) ----
+// ---- Sly Deal ----
 function startSlyDeal(card) {
   const targets = [];
   gameState.opponents.forEach(opp => {
@@ -1047,9 +1247,8 @@ function startSlyDeal(card) {
   openPicker('Steal a property (not from complete sets)', targets);
 }
 
-// ---- Forced Deal: pick your property -> pick player -> pick their property ----
+// ---- Forced Deal ----
 function startForcedDeal(card) {
-  // First pick your property to offer
   const myCards = [];
   gameState.you.properties.forEach(g => {
     g.cards.forEach(c => {
@@ -1061,7 +1260,6 @@ function startForcedDeal(card) {
     label: mc.label,
     action: () => {
       closePicker();
-      // Now pick opponent's property
       const targets = [];
       gameState.opponents.forEach(opp => {
         if (!opp.properties) return;
@@ -1082,7 +1280,7 @@ function startForcedDeal(card) {
   })));
 }
 
-// ---- Deal Breaker: pick player -> pick their complete set ----
+// ---- Deal Breaker ----
 function startDealBreaker(card) {
   const targets = [];
   gameState.opponents.forEach(opp => {
@@ -1101,7 +1299,7 @@ function startDealBreaker(card) {
   openPicker('Steal a complete set', targets);
 }
 
-// ---- House/Hotel: pick your complete set ----
+// ---- House/Hotel ----
 function pickCompleteSetForHouseHotel(card, actionType) {
   const targets = [];
   gameState.you.properties.forEach(g => {
@@ -1129,8 +1327,13 @@ function openPicker(title, items) {
     const div = document.createElement('div');
     div.className = 'pick-item' + (item.disabled ? ' disabled' : '');
     div.textContent = item.label;
-    if (item.color) div.style.borderLeftColor = item.color;
-    if (!item.disabled) div.addEventListener('click', item.action);
+    if (item.color) div.style.borderLeft = '4px solid ' + item.color;
+    if (!item.disabled) {
+      div.addEventListener('click', () => {
+        haptic('medium');
+        item.action();
+      });
+    }
     list.appendChild(div);
   });
   document.getElementById('pickerModal').classList.add('active');
@@ -1141,14 +1344,16 @@ function closePicker() {
 }
 
 // ============================================================
-// PAYMENT MODAL
+// PAYMENT MODAL — fullscreen
 // ============================================================
 let paymentState = { pendingAction: null, selectedCards: new Set() };
 
 function handlePendingAction(pa) {
-  // Check if we're a target who hasn't responded yet
   if (!pa.targetPlayerIds.includes(myPlayerId)) return;
   if (pa.respondedPlayerIds && pa.respondedPlayerIds.includes(myPlayerId)) return;
+
+  // Flash red when targeted
+  flashTargeted();
 
   // Check for JSN chain first
   if (pa.justSayNoChain && pa.justSayNoChain.length > 0) {
@@ -1173,20 +1378,22 @@ function handlePendingAction(pa) {
 function showPaymentModal(pa) {
   paymentState = { pendingAction: pa, selectedCards: new Set() };
   const modal = document.getElementById('paymentModal');
-  document.getElementById('payAmount').textContent = `$${pa.amount}M owed`;
+  document.getElementById('payAmount').textContent = `$${pa.amount}M`;
 
   const container = document.getElementById('payItems');
   container.innerHTML = '';
 
-  // Bank cards
   const me = gameState.you;
+
+  // Bank cards
   if (me.bank.length > 0) {
-    container.innerHTML += '<div class="pay-section"><div class="pay-section-title">Bank</div></div>';
+    container.innerHTML += '<div class="pay-section"><div class="pay-section-title">Bank Cards</div></div>';
     me.bank.forEach(c => {
       container.innerHTML += `
-        <div class="pay-item" onclick="togglePayCard('${c.id}', ${c.bankValue})">
-          <input type="checkbox" id="pay_${c.id}" ${paymentState.selectedCards.has(c.id) ? 'checked' : ''}>
-          <label for="pay_${c.id}">${esc(c.name)} — $${c.bankValue}M</label>
+        <div class="pay-chip" id="paychip_${c.id}" onclick="togglePayCard('${c.id}')">
+          <div class="pay-chip-check"></div>
+          <div class="pay-chip-label">${esc(c.name)}</div>
+          <div class="pay-chip-value">$${c.bankValue}M</div>
         </div>`;
     });
   }
@@ -1197,9 +1404,10 @@ function showPaymentModal(pa) {
     me.properties.forEach(g => {
       g.cards.forEach(c => {
         container.innerHTML += `
-          <div class="pay-item" onclick="togglePayCard('${c.id}', ${c.bankValue})">
-            <input type="checkbox" id="pay_${c.id}" ${paymentState.selectedCards.has(c.id) ? 'checked' : ''}>
-            <label for="pay_${c.id}">${esc(c.name)} (${COLOR_LABELS[g.color]}) — $${c.bankValue}M</label>
+          <div class="pay-chip" id="paychip_${c.id}" onclick="togglePayCard('${c.id}')">
+            <div class="pay-chip-check"></div>
+            <div class="pay-chip-label">${esc(c.name)} <span style="color:var(--muted);font-size:12px">(${COLOR_LABELS[g.color]})</span></div>
+            <div class="pay-chip-value">$${c.bankValue}M</div>
           </div>`;
       });
     });
@@ -1215,14 +1423,21 @@ function showPaymentModal(pa) {
   modal.classList.add('active');
 }
 
-function togglePayCard(cardId, value) {
+function togglePayCard(cardId) {
   if (paymentState.selectedCards.has(cardId)) {
     paymentState.selectedCards.delete(cardId);
   } else {
     paymentState.selectedCards.add(cardId);
   }
-  const cb = document.getElementById('pay_' + cardId);
-  if (cb) cb.checked = paymentState.selectedCards.has(cardId);
+  haptic('light');
+
+  // Update chip visual
+  const chip = document.getElementById('paychip_' + cardId);
+  if (chip) {
+    if (paymentState.selectedCards.has(cardId)) chip.classList.add('selected');
+    else chip.classList.remove('selected');
+  }
+
   updatePayTotal();
 }
 
@@ -1237,7 +1452,11 @@ function updatePayTotal() {
       if (inProp) total += inProp.bankValue;
     });
   });
-  document.getElementById('payTotal').textContent = `Selected: $${total}M / $${paymentState.pendingAction.amount}M`;
+  const needed = paymentState.pendingAction.amount;
+  document.getElementById('payNeeded').textContent = `Needed: $${needed}M`;
+  const selEl = document.getElementById('paySelected');
+  selEl.textContent = `Selected: $${total}M`;
+  selEl.className = 'selected-total' + (total >= needed ? ' enough' : '');
 }
 
 function submitPayment() {
@@ -1253,7 +1472,7 @@ function playJSNFromPayment() {
   document.getElementById('paymentModal').classList.remove('active');
 }
 
-// ---- Steal Response Modal (reuse picker) ----
+// ---- Steal Response Modal ----
 function showStealResponseModal(pa) {
   const hasJSN = gameState.you.hand.some(c => c.type === 'action_just_say_no');
   const items = [
@@ -1295,7 +1514,6 @@ function showJSNChain(pa) {
     });
   }
 
-  // Determine if it's our turn to respond in the chain
   const lastLink = pa.justSayNoChain[pa.justSayNoChain.length - 1];
   const weNeedToRespond = lastLink && lastLink.playerId !== myPlayerId;
 
@@ -1334,9 +1552,10 @@ function showDiscardModal() {
   container.innerHTML = '';
   me.hand.forEach(c => {
     container.innerHTML += `
-      <div class="pay-item" onclick="toggleDiscard('${c.id}')">
-        <input type="checkbox" id="disc_${c.id}">
-        <label for="disc_${c.id}">${esc(c.name)} ($${c.bankValue}M)</label>
+      <div class="pay-chip" id="discchip_${c.id}" onclick="toggleDiscard('${c.id}')">
+        <div class="pay-chip-check"></div>
+        <div class="pay-chip-label">${esc(c.name)}</div>
+        <div class="pay-chip-value">$${c.bankValue}M</div>
       </div>`;
   });
   document.getElementById('discardBtn').textContent = `Discard (0/${excess})`;
@@ -1346,8 +1565,14 @@ function showDiscardModal() {
 function toggleDiscard(cardId) {
   if (discardSelected.has(cardId)) discardSelected.delete(cardId);
   else discardSelected.add(cardId);
-  const cb = document.getElementById('disc_' + cardId);
-  if (cb) cb.checked = discardSelected.has(cardId);
+  haptic('light');
+
+  const chip = document.getElementById('discchip_' + cardId);
+  if (chip) {
+    if (discardSelected.has(cardId)) chip.classList.add('selected');
+    else chip.classList.remove('selected');
+  }
+
   const excess = gameState.you.hand.length - 7;
   document.getElementById('discardBtn').textContent = `Discard (${discardSelected.size}/${excess})`;
 }
@@ -1385,7 +1610,6 @@ function showGameOver(payload) {
   const isMe = payload.winnerId === myPlayerId;
   document.getElementById('winnerText').textContent = isMe ? 'You Win!' : `${payload.winnerName} Wins!`;
 
-  // Show winning sets if we have final state
   const setsDiv = document.getElementById('winnerSets');
   setsDiv.innerHTML = '';
   if (gameState) {
@@ -1436,7 +1660,7 @@ function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.remove('active');
-  void el.offsetWidth; // force reflow
+  void el.offsetWidth;
   el.classList.add('active');
   setTimeout(() => el.classList.remove('active'), 3000);
 }
@@ -1464,9 +1688,10 @@ function copyRoomCode() {
 // Close modals on escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    closeContextMenu();
+    closeActionPanel();
     closePicker();
     document.getElementById('jsnModal').classList.remove('active');
+    document.getElementById('paymentModal').classList.remove('active');
   }
 });
 
