@@ -76,46 +76,36 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 #landing::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
   background:rgba(0,0,0,0.6);pointer-events:none;z-index:0}
 
-/* Floating emoji decorations */
-.landing-deco{position:absolute;pointer-events:none;font-size:28px;opacity:.15;z-index:1;
-  animation:floatDeco 6s ease-in-out infinite}
-.landing-deco:nth-child(1){top:12%;left:8%;animation-delay:0s}
-.landing-deco:nth-child(2){top:18%;right:10%;animation-delay:1.5s;font-size:24px}
-.landing-deco:nth-child(3){bottom:25%;left:12%;animation-delay:3s;font-size:32px}
-.landing-deco:nth-child(4){bottom:30%;right:8%;animation-delay:4.5s;font-size:22px}
-.landing-deco:nth-child(5){top:40%;left:4%;animation-delay:2s;font-size:20px}
-@keyframes floatDeco{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-12px) rotate(5deg)}}
+/* Floating emoji decorations — reduced count, slower drift */
+.landing-deco{position:absolute;pointer-events:none;font-size:24px;opacity:.1;z-index:1;
+  animation:floatDeco 10s ease-in-out infinite}
+.landing-deco:nth-child(1){top:10%;left:6%;animation-delay:0s}
+.landing-deco:nth-child(2){top:20%;right:8%;animation-delay:2s;font-size:20px}
+.landing-deco:nth-child(3){bottom:22%;left:10%;animation-delay:4s;font-size:26px}
+.landing-deco:nth-child(4){bottom:28%;right:6%;animation-delay:6s;font-size:18px}
+.landing-deco:nth-child(5){top:42%;left:5%;animation-delay:3s;font-size:16px}
+.landing-deco:nth-child(6){top:60%;right:12%;animation-delay:5s;font-size:22px}
+@keyframes floatDeco{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(3deg)}}
 
-/* Sparkle particles */
-.sparkle{position:absolute;width:3px;height:3px;border-radius:50%;background:#FFD700;
-  pointer-events:none;z-index:1;opacity:0;animation:sparkleAnim 3s ease-in-out infinite}
-@keyframes sparkleAnim{0%,100%{opacity:0;transform:scale(0)}50%{opacity:.6;transform:scale(1)}}
+/* Sparkle particles — reduced density */
+.sparkle{position:absolute;width:2px;height:2px;border-radius:50%;background:#FFD700;
+  pointer-events:none;z-index:1;opacity:0;animation:sparkleAnim 4s ease-in-out infinite}
+@keyframes sparkleAnim{0%,100%{opacity:0;transform:scale(0)}50%{opacity:.4;transform:scale(1)}}
 
-/* Title plaque */
-.title-plaque{position:relative;z-index:1;padding:20px 32px;margin-bottom:4px;
-  background:linear-gradient(135deg,rgba(15,32,53,.85),rgba(10,22,40,.9));
-  border-radius:20px;border:2px solid rgba(201,169,78,.3);
-  box-shadow:0 8px 32px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.title-plaque h1{font-family:'Fredoka',sans-serif;font-size:34px;text-align:center;color:var(--gold-bright);
-  text-shadow:0 2px 12px rgba(255,215,0,.4),0 0 40px rgba(201,169,78,.2);
-  font-weight:700;letter-spacing:1px}
-.title-plaque .sub{color:var(--muted);font-size:14px;text-align:center;margin-top:4px}
+/* Landing title block — stacked MONOPOLY / DEAL / ONLINE */
+.landing-title-block{position:relative;z-index:1;text-align:center;margin-bottom:40px}
+.landing-title-block .title-monopoly{font-family:'Fredoka',sans-serif;font-size:48px;font-weight:700;
+  color:#fff;letter-spacing:3px;line-height:1;margin-bottom:8px}
+.landing-title-block .title-deal{font-family:'Fredoka',sans-serif;font-size:64px;font-weight:700;
+  color:#FFD700;letter-spacing:2px;line-height:1;margin-bottom:4px;
+  text-shadow:0 0 20px rgba(255,215,0,0.5),0 0 40px rgba(255,215,0,0.2)}
+.landing-title-block .title-online{font-family:'Fredoka',sans-serif;font-size:18px;font-weight:600;
+  color:#2ED1C0;letter-spacing:5px;text-transform:uppercase;line-height:1}
 
-/* Fanned cards behind title */
-.title-cards{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:-1;pointer-events:none}
-.title-card-fan{width:50px;height:72px;border-radius:6px;position:absolute;
-  box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid rgba(255,255,255,.15)}
-.title-card-fan:nth-child(1){background:linear-gradient(135deg,#DC143C,#ff2d55);
-  transform:translate(-65px,-36px) rotate(-20deg)}
-.title-card-fan:nth-child(2){background:linear-gradient(135deg,#1565C0,#1e88e5);
-  transform:translate(-25px,-36px) rotate(-8deg)}
-.title-card-fan:nth-child(3){background:linear-gradient(135deg,#2E7D32,#43a047);
-  transform:translate(15px,-36px) rotate(8deg)}
-
-#landing .group{display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;z-index:1}
+#landing .group{display:flex;flex-direction:column;gap:12px;width:100%;max-width:340px;z-index:1}
 #landing .row{display:flex;gap:8px}
 #landing .row input{flex:1}
+#landing .group .btn-primary,#landing .group .btn-join{padding:16px 28px;font-size:16px;font-weight:700}
 .btn-primary{background:linear-gradient(135deg,#E94560,#c0392b);color:#fff;font-weight:700;
   box-shadow:0 4px 16px rgba(233,69,96,.3),inset 0 1px 0 rgba(255,255,255,.2)}
 .btn-primary:hover{box-shadow:0 6px 20px rgba(233,69,96,.4)}
@@ -144,8 +134,9 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 #lobby::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
   background:rgba(0,0,0,0.6);pointer-events:none;z-index:0}
 #lobby>*{position:relative;z-index:1}
-#lobby h1{color:var(--gold-bright);text-shadow:0 2px 12px rgba(255,215,0,.3);
-  font-family:'Fredoka',sans-serif;font-weight:700}
+#lobby .lobby-header{color:#fff;font-family:'Fredoka',sans-serif;font-weight:700;
+  font-size:28px;letter-spacing:1px;text-align:center}
+#lobby .lobby-header .lh-deal{color:var(--gold-bright);text-shadow:0 0 12px rgba(255,215,0,.3)}
 #lobby .lobby-panel{background:rgba(10,22,40,.7);border-radius:20px;border:2px solid rgba(201,169,78,.25);
   padding:24px;width:100%;max-width:380px;
   box-shadow:0 8px 32px rgba(0,0,0,.4);
@@ -475,10 +466,54 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .hand-card.card-money .hc-amount{color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.3);position:relative;z-index:1}
 .hand-card.card-money .hc-body{position:relative;z-index:1}
 
-/* ---- Action Card — rich purple ---- */
+/* ---- Action Card — base (fallback purple) ---- */
 .hand-card.card-action{background:linear-gradient(135deg,#7B1FA2,#6A1B9A);color:#fff;
   border-color:rgba(123,31,162,.3)}
 .hand-card.card-action .hc-color-bar{background:rgba(255,255,255,.12)}
+
+/* ---- Per-action-type colors ---- */
+.hand-card.card-action-pass-go{background:#FFFFFF;color:#333;border-color:rgba(0,0,0,.12)}
+.hand-card.card-action-pass-go .hc-color-bar{background:rgba(0,0,0,.06);color:#333}
+.hand-card.card-action-pass-go .hc-name{color:#2E7D32;font-weight:800}
+.hand-card.card-action-pass-go .hc-footer{color:#888;background:rgba(0,0,0,.04)}
+
+.hand-card.card-action-debt-collector{background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;
+  border-color:rgba(21,101,192,.4)}
+.hand-card.card-action-debt-collector .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-birthday{background:linear-gradient(135deg,#E91E63,#C2185B);color:#fff;
+  border-color:rgba(233,30,99,.4)}
+.hand-card.card-action-birthday .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-sly-deal{background:linear-gradient(135deg,#4FC3F7,#29B6F6);color:#1a1a1a;
+  border-color:rgba(79,195,247,.4)}
+.hand-card.card-action-sly-deal .hc-color-bar{background:rgba(0,0,0,.06);color:#1a1a1a}
+.hand-card.card-action-sly-deal .hc-footer{color:#444;background:rgba(0,0,0,.04)}
+
+.hand-card.card-action-forced-deal{background:linear-gradient(135deg,#29B6F6,#039BE5);color:#fff;
+  border-color:rgba(41,182,246,.4)}
+.hand-card.card-action-forced-deal .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-deal-breaker{background:linear-gradient(135deg,#4A148C,#38006b);color:#fff;
+  border-color:rgba(74,20,140,.4)}
+.hand-card.card-action-deal-breaker .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-jsn{background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;
+  border-color:rgba(46,125,50,.4)}
+.hand-card.card-action-jsn .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-double-rent{background:#FFFFFF;color:#333;
+  border:3px solid #FFD700;box-shadow:0 4px 12px var(--card-shadow),0 0 8px rgba(255,215,0,.25)}
+.hand-card.card-action-double-rent .hc-color-bar{background:rgba(255,215,0,.12);color:#333}
+.hand-card.card-action-double-rent .hc-footer{color:#888;background:rgba(0,0,0,.04)}
+
+.hand-card.card-action-house{background:linear-gradient(135deg,#1976D2,#1565C0);color:#fff;
+  border-color:rgba(25,118,210,.4)}
+.hand-card.card-action-house .hc-color-bar{background:rgba(255,255,255,.12)}
+
+.hand-card.card-action-hotel{background:linear-gradient(135deg,#388E3C,#2E7D32);color:#fff;
+  border-color:rgba(56,142,60,.4)}
+.hand-card.card-action-hotel .hc-color-bar{background:rgba(255,255,255,.12)}
 
 /* ---- Rent Card — bright red/crimson ---- */
 .hand-card.card-rent{background:linear-gradient(135deg,#C62828,#B71C1C);color:#fff;
@@ -865,11 +900,9 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   .table-center{gap:16px;padding:12px 8px}
   .draw-pile-stack,.card-back{width:54px;height:76px}
   .discard-card{width:54px;height:76px}
-  .title-plaque h1{font-size:26px}
-  .title-card-fan{width:40px;height:58px}
-  .title-card-fan:nth-child(1){transform:translate(-50px,-29px) rotate(-20deg)}
-  .title-card-fan:nth-child(2){transform:translate(-20px,-29px) rotate(-8deg)}
-  .title-card-fan:nth-child(3){transform:translate(10px,-29px) rotate(8deg)}
+  .landing-title-block .title-monopoly{font-size:36px}
+  .landing-title-block .title-deal{font-size:48px}
+  .landing-title-block .title-online{font-size:14px;letter-spacing:3px}
 }
 </style>
 </head>
@@ -887,28 +920,23 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 <!-- ============ LANDING ============ -->
 <div id="landing" class="screen active">
-  <!-- Floating emoji decorations -->
+  <!-- Floating emoji decorations (reduced) -->
   <span class="landing-deco">&#127183;</span>
   <span class="landing-deco">&#128176;</span>
   <span class="landing-deco">&#127968;</span>
   <span class="landing-deco">&#128178;</span>
   <span class="landing-deco">&#127919;</span>
-  <!-- Sparkle particles -->
+  <span class="landing-deco">&#128179;</span>
+  <!-- Sparkle particles (reduced) -->
   <span class="sparkle" style="top:15%;left:20%;animation-delay:0s"></span>
-  <span class="sparkle" style="top:25%;right:15%;animation-delay:1s"></span>
-  <span class="sparkle" style="top:55%;left:10%;animation-delay:2s"></span>
-  <span class="sparkle" style="top:45%;right:25%;animation-delay:0.5s"></span>
-  <span class="sparkle" style="top:70%;left:30%;animation-delay:1.5s"></span>
-  <span class="sparkle" style="top:35%;left:45%;animation-delay:2.5s"></span>
-  <!-- Title plaque with fanned cards behind -->
-  <div class="title-plaque">
-    <div class="title-cards">
-      <div class="title-card-fan"></div>
-      <div class="title-card-fan"></div>
-      <div class="title-card-fan"></div>
-    </div>
-    <h1>Monopoly Deal</h1>
-    <p class="sub">Real-time multiplayer card game</p>
+  <span class="sparkle" style="top:25%;right:15%;animation-delay:1.5s"></span>
+  <span class="sparkle" style="top:55%;left:10%;animation-delay:3s"></span>
+  <span class="sparkle" style="top:70%;right:20%;animation-delay:4.5s"></span>
+  <!-- Stacked title -->
+  <div class="landing-title-block">
+    <div class="title-monopoly">MONOPOLY</div>
+    <div class="title-deal">DEAL</div>
+    <div class="title-online">ONLINE</div>
   </div>
   <div class="group">
     <input id="nameInput" placeholder="Your name" maxlength="20" autocomplete="off">
@@ -936,7 +964,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 <!-- ============ LOBBY ============ -->
 <div id="lobby" class="screen">
-  <h1>Game Lobby</h1>
+  <div class="lobby-header">MONOPOLY <span class="lh-deal">DEAL</span></div>
   <div class="lobby-panel">
     <div class="room-code-wrapper">
       <div class="room-code" id="lobbyCode"></div>
@@ -1897,13 +1925,23 @@ function getDiscardBackground(card) {
   if (t === 'property_wild_all') return 'linear-gradient(135deg,#DC143C,#FF8C00,#FFD700,#228B22,#00008B)';
   if (t === 'money') return 'linear-gradient(135deg,#1a7a3a,#0e5c28)';
   if (t.startsWith('rent_')) return '#7D3C98';
-  if (t.startsWith('action_')) return '#9B59B6';
+  if (t.startsWith('action_')) {
+    const actionDiscardColors = {
+      action_pass_go:'#f5f5f5', action_debt_collector:'#1565C0',
+      action_its_my_birthday:'#E91E63', action_sly_deal:'#4FC3F7',
+      action_forced_deal:'#29B6F6', action_deal_breaker:'#4A148C',
+      action_just_say_no:'#2E7D32', action_double_rent:'#f5f5f5',
+      action_house:'#1976D2', action_hotel:'#388E3C'
+    };
+    return actionDiscardColors[t] || '#9B59B6';
+  }
   return '#666';
 }
 
 function getDiscardTextColor(card) {
   const light = ['light_blue','yellow','utility'];
   if (card.type === 'property' && light.includes(card.color)) return '#222';
+  if (card.type === 'action_pass_go' || card.type === 'action_double_rent' || card.type === 'action_sly_deal') return '#222';
   return '#fff';
 }
 
@@ -2114,6 +2152,13 @@ function renderHand() {
     div.className = 'hand-card ' + cardClass + (selectedCardId === card.id ? ' selected' : '') + (isNew ? ' is-new' : '');
     div.dataset.cardId = card.id;
 
+    // Money card denomination borders
+    if (card.type === 'money') {
+      const moneyBorders = {1:'#FFFFFF',2:'#E91E63',3:'#1976D2',4:'#388E3C',5:'#7B1FA2',10:'#F57C00'};
+      const bc = moneyBorders[card.bankValue];
+      if (bc) div.style.border = '3px solid ' + bc;
+    }
+
     div.innerHTML = (isNew ? '<div class="new-badge">NEW</div>' : '') + buildCardHTML(card);
 
     div.addEventListener('click', (e) => {
@@ -2131,7 +2176,21 @@ function getCardClass(card) {
   if (t === 'property_wild_all') return 'card-wild-all';
   if (t === 'money') return 'card-money';
   if (t.startsWith('rent_')) return 'card-rent';
-  if (t.startsWith('action_')) return 'card-action';
+  if (t.startsWith('action_')) {
+    const actionClassMap = {
+      action_pass_go: 'card-action card-action-pass-go',
+      action_debt_collector: 'card-action card-action-debt-collector',
+      action_its_my_birthday: 'card-action card-action-birthday',
+      action_sly_deal: 'card-action card-action-sly-deal',
+      action_forced_deal: 'card-action card-action-forced-deal',
+      action_deal_breaker: 'card-action card-action-deal-breaker',
+      action_just_say_no: 'card-action card-action-jsn',
+      action_double_rent: 'card-action card-action-double-rent',
+      action_house: 'card-action card-action-house',
+      action_hotel: 'card-action card-action-hotel'
+    };
+    return actionClassMap[t] || 'card-action';
+  }
   return 'card-action';
 }
 
@@ -2160,7 +2219,7 @@ function getRentChargeForCard(card) {
 function buildCardHTML(card) {
   const t = card.type;
 
-  // Money card — large denomination
+  // Money card — large denomination with colored border
   if (t === 'money') {
     return `
       <div class="hc-color-bar" style="background:rgba(255,255,255,.15)">MONEY</div>
@@ -2252,25 +2311,26 @@ function buildCardHTML(card) {
     `;
   }
 
-  // Action cards
+  // Action cards — per-type styling
   const actionLabels = {
-    action_pass_go: {icon:'&#9654;', desc:'Draw 2 cards'},
-    action_debt_collector: {icon:'&#128176;', desc:'Collect $5M'},
-    action_its_my_birthday: {icon:'&#127874;', desc:'All pay $2M'},
-    action_forced_deal: {icon:'&#8644;', desc:'Swap properties'},
-    action_sly_deal: {icon:'&#128064;', desc:'Steal 1 property'},
-    action_deal_breaker: {icon:'&#128165;', desc:'Steal full set'},
-    action_just_say_no: {icon:'&#9995;', desc:'Block action'},
-    action_double_rent: {icon:'&#215;2', desc:'Double rent'},
-    action_house: {icon:'&#127968;', desc:'+$3M rent'},
-    action_hotel: {icon:'&#127960;', desc:'+$4M rent'}
+    action_pass_go: {icon:'<span style="font-size:20px">&#9654;</span>', label:'<span style="color:#2E7D32;font-weight:800;font-size:12px">GO</span>', desc:'Draw 2 cards', bar:'PASS GO'},
+    action_debt_collector: {icon:'&#128176;', desc:'Collect $5M', bar:'DEBT COLLECTOR'},
+    action_its_my_birthday: {icon:'&#127874;', desc:'All pay $2M', bar:'BIRTHDAY'},
+    action_forced_deal: {icon:'<span style="font-size:18px">&#8644;</span>', desc:'Swap properties', bar:'FORCED DEAL'},
+    action_sly_deal: {icon:'&#128064;', desc:'Steal 1 property', bar:'SLY DEAL'},
+    action_deal_breaker: {icon:'&#128165;', desc:'Steal full set', bar:'DEAL BREAKER'},
+    action_just_say_no: {icon:'&#9995;', label:'<span style="font-weight:900;font-size:14px">NO!</span>', desc:'Block action', bar:'JUST SAY NO'},
+    action_double_rent: {icon:'<span style="font-size:20px;font-weight:900;color:#B8860B">×2</span>', desc:'Double rent', bar:'DOUBLE RENT'},
+    action_house: {icon:'&#127968;', desc:'+$3M rent', bar:'HOUSE'},
+    action_hotel: {icon:'&#127960;', desc:'+$4M rent', bar:'HOTEL'}
   };
-  const info = actionLabels[t] || {icon:'&#9733;', desc:''};
+  const info = actionLabels[t] || {icon:'&#9733;', desc:'', bar:'ACTION'};
   return `
     <div class="hc-badge">$${card.bankValue}M</div>
-    <div class="hc-color-bar" style="background:rgba(255,255,255,.15)">ACTION</div>
+    <div class="hc-color-bar">${info.bar || 'ACTION'}</div>
     <div class="hc-body">
       <div style="font-size:18px">${info.icon}</div>
+      ${info.label ? `<div>${info.label}</div>` : ''}
       <div class="hc-name">${esc(card.name)}</div>
       <div class="hc-desc">${info.desc}</div>
     </div>
