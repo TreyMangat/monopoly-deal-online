@@ -6,77 +6,73 @@ import SwiftUI
 
 struct MainMenuView: View {
     @Environment(GameViewModel.self) private var viewModel
-    @State private var showCreateGame = false
-    @State private var showJoinGame = false
     @State private var showHowToPlay = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 32) {
-                Spacer()
+        VStack(spacing: 32) {
+            Spacer()
 
-                // Title
-                VStack(spacing: 8) {
-                    Text("MONOPOLY")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(.blue)
-                    Text("DEAL ONLINE")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                // Buttons
-                VStack(spacing: 16) {
-                    NavigationLink(destination: CreateGameView()) {
-                        Label("Create Game", systemImage: "plus.circle.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.blue)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-
-                    NavigationLink(destination: JoinGameView()) {
-                        Label("Join Game", systemImage: "person.2.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.green)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-
-                    Button {
-                        showHowToPlay = true
-                    } label: {
-                        Label("How to Play", systemImage: "questionmark.circle.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.orange)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                }
-                .font(.headline)
-                .padding(.horizontal, 32)
-
-                Spacer()
-
-                // Connection status
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(viewModel.connectionStatus.rawValue.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 16)
+            // Title
+            VStack(spacing: 8) {
+                Text("MONOPOLY")
+                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .foregroundStyle(.blue)
+                Text("DEAL ONLINE")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
-            .sheet(isPresented: $showHowToPlay) {
-                HowToPlaySheet()
+
+            Spacer()
+
+            // Buttons
+            VStack(spacing: 16) {
+                NavigationLink(value: AppRoute.createGame) {
+                    Label("Create Game", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.blue)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+
+                NavigationLink(value: AppRoute.joinGame) {
+                    Label("Join Game", systemImage: "person.2.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.green)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+
+                Button {
+                    showHowToPlay = true
+                } label: {
+                    Label("How to Play", systemImage: "questionmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.orange)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
             }
+            .font(.headline)
+            .padding(.horizontal, 32)
+
+            Spacer()
+
+            // Connection status
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(viewModel.connectionStatus.rawValue.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.bottom, 16)
+        }
+        .sheet(isPresented: $showHowToPlay) {
+            HowToPlaySheet()
         }
     }
 

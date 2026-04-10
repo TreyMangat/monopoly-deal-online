@@ -9,6 +9,15 @@ import Foundation
 import Combine
 import Observation
 
+// MARK: - Navigation Routes
+
+enum AppRoute: Hashable {
+    case createGame
+    case joinGame
+    case lobby
+    case gameBoard
+}
+
 @Observable
 final class GameViewModel {
     // MARK: - Published State
@@ -23,6 +32,10 @@ final class GameViewModel {
     var errorMessage: String?
     var gameOverWinner: String?
 
+    // MARK: - Navigation
+
+    var navigationPath: [AppRoute] = []
+
     // MARK: - Session Info (read-only from outside)
 
     var playerId: String? { client.playerId }
@@ -35,13 +48,58 @@ final class GameViewModel {
     }
 
     var isMyTurn: Bool {
-        guard let state = currentState, let playerId else { return false }
-        let currentPlayer = state.currentPlayerIndex < (state.opponents.count + 1)
-            ? (state.you.id == playerId ? state.you.id : "")
-            : ""
-        return state.you.id == playerId
-            && state.phase == .play
-            && getCurrentPlayerId() == playerId
+        currentState?.currentPlayerIndex == 0
+    }
+
+    var isPaymentPending: Bool {
+        guard let state = currentState,
+              state.phase == .awaitingResponse,
+              let pending = state.pendingAction,
+              pending.targetPlayerIds.contains(state.you.id),
+              !pending.respondedPlayerIds.contains(state.you.id)
+        else { return false }
+        switch pending.type {
+        case .payRent, .payDebtCollector, .payBirthday:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var isStealPending: Bool {
+        guard let state = currentState,
+              state.phase == .awaitingResponse,
+              let pending = state.pendingAction,
+              pending.targetPlayerIds.contains(state.you.id),
+              !pending.respondedPlayerIds.contains(state.you.id)
+        else { return false }
+        switch pending.type {
+        case .respondToSlyDeal, .respondToForcedDeal, .respondToDealBreaker, .counterJustSayNo:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var shouldShowDiscard: Bool {
+        currentState?.phase == .discard
+    }
+
+    var shouldShowGameOver: Bool {
+        currentState?.phase == .gameOver
+    }
+
+    var currentPlayerName: String {
+        guard let state = currentState else { return "" }
+        let allPlayers = [state.you.name] + state.opponents.map(\.name)
+        guard state.currentPlayerIndex >= 0,
+              state.currentPlayerIndex < allPlayers.count
+        else { return "" }
+        return allPlayers[state.currentPlayerIndex]
+    }
+
+    var justSayNoCardId: String? {
+        currentState?.you.hand.first(where: { $0.type == .actionJustSayNo })?.id
     }
 
     // MARK: - Private
@@ -216,21 +274,10 @@ final class GameViewModel {
         client.sendAction(action)
     }
 
-    // MARK: - Helpers
+    // MARK: - Send Raw Action
 
-    private func getCurrentPlayerId() -> String? {
-        guard let state = currentState else { return nil }
-        // Index 0 is always "you" in the full player list; reconstruct the order
-        // The server sends currentPlayerIndex relative to the full player array.
-        // We can check if it matches you or find the opponent at that index.
-        let allPlayers = [state.you.id] + state.opponents.map(\.id)
-        // But currentPlayerIndex is the server's absolute index — we need to
-        // compare against the server's player ordering.
-        // Simplest: check if you.id matches by checking the phase/pending action
-        // Actually the server's currentPlayerIndex maps to the original join order.
-        // Without the full ordered list, compare you.id and opponents by index.
-        // For correctness, just check if the game says it's our turn:
-        return state.you.id // The server filters state per-player; we check phase instead
+    func sendAction(_ action: PlayerAction) {
+        client.sendAction(action)
     }
 
     // MARK: - Event Handling

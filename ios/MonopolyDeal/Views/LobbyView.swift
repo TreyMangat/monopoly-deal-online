@@ -133,6 +133,13 @@ struct LobbyView: View {
         .padding()
         .navigationTitle("Lobby")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: viewModel.currentState?.phase) { oldPhase, newPhase in
+            if (oldPhase == nil || oldPhase == .waitingToStart),
+               let phase = newPhase,
+               phase != .waitingToStart {
+                viewModel.navigationPath.append(.gameBoard)
+            }
+        }
     }
 
     private func avatarEmoji(for index: Int) -> String {

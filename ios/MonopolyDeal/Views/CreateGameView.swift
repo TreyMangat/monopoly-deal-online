@@ -8,8 +8,7 @@ struct CreateGameView: View {
     @Environment(GameViewModel.self) private var viewModel
     @State private var playerName = ""
     @State private var selectedAvatar = 0
-    @State private var serverURL = "wss://monopoly-deal-online.up.railway.app/ws"
-    @State private var navigateToLobby = false
+    @State private var serverURL = "wss://monopoly-deal-online.onrender.com/ws"
 
     private let avatars = ["😎", "🤠", "👻", "🦊", "🐙", "🤖"]
 
@@ -65,12 +64,9 @@ struct CreateGameView: View {
             }
         }
         .navigationTitle("Create Game")
-        .navigationDestination(isPresented: $navigateToLobby) {
-            LobbyView()
-        }
         .onChange(of: viewModel.roomInfo) {
             if viewModel.roomInfo != nil {
-                navigateToLobby = true
+                viewModel.navigationPath.append(.lobby)
             }
         }
     }
