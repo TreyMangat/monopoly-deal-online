@@ -206,6 +206,130 @@ describe("Turn Actions", () => {
   });
 });
 
+// ---- Double Rent Tests ----
+
+describe("Double Rent", () => {
+  function setupDoubleRentScenario() {
+    const state = initializeGame("TEST", [
+      { id: "p1", name: "Alice", avatar: 0 },
+      { id: "p2", name: "Bob", avatar: 1 },
+    ]);
+
+    const player = state.players[0];
+
+    // Give p1 a Double Rent card
+    const doubleRentCard = {
+      id: "test_double_rent",
+      type: CardType.ActionDoubleRent,
+      name: "Double the Rent",
+      bankValue: 1,
+    };
+    player.hand.push(doubleRentCard);
+
+    // Give p1 a 2-color rent card for dark blue / green
+    const rentCard = {
+      id: "test_rent_darkblue",
+      type: CardType.RentTwoColor,
+      name: "Rent (Dark Blue / Green)",
+      bankValue: 1,
+      rentColors: [PropertyColor.DarkBlue, PropertyColor.Green] as [PropertyColor, PropertyColor],
+    };
+    player.hand.push(rentCard);
+
+    // Give p1 a dark blue property so rent is non-zero
+    player.properties.push({
+      color: PropertyColor.DarkBlue,
+      cards: [
+        { id: "test_park", type: CardType.Property, name: "Park Place", bankValue: 4, color: PropertyColor.DarkBlue },
+      ],
+      hasHouse: false,
+      hasHotel: false,
+    });
+
+    // Give p2 some money so they can pay
+    state.players[1].bank.push({
+      id: "test_money_10",
+      type: CardType.Money,
+      name: "$10M",
+      bankValue: 10,
+    });
+
+    return { state, doubleRentCard, rentCard };
+  }
+
+  it("should double rent when Double Rent is played before a rent card", () => {
+    const { state, doubleRentCard, rentCard } = setupDoubleRentScenario();
+
+    // Play Double Rent
+    const r1 = applyAction(state, {
+      type: ActionType.PlayDoubleRent,
+      playerId: "p1",
+      cardId: doubleRentCard.id,
+    });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    expect(r1.state.doubleRentActive).toBe(true);
+
+    // Play Rent card — should be doubled
+    const r2 = applyAction(r1.state, {
+      type: ActionType.PlayRentCard,
+      playerId: "p1",
+      cardId: rentCard.id,
+      targetColor: PropertyColor.DarkBlue,
+    });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+
+    // Dark blue with 1 property = $3 base rent, doubled = $6
+    expect(r2.state.pendingAction).not.toBeNull();
+    expect(r2.state.pendingAction!.amount).toBe(6);
+    expect(r2.state.pendingAction!.isDoubled).toBe(true);
+  });
+
+  it("should reset doubleRentActive after rent is charged", () => {
+    const { state, doubleRentCard, rentCard } = setupDoubleRentScenario();
+
+    // Play Double Rent
+    const r1 = applyAction(state, {
+      type: ActionType.PlayDoubleRent,
+      playerId: "p1",
+      cardId: doubleRentCard.id,
+    });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+
+    // Play Rent card
+    const r2 = applyAction(r1.state, {
+      type: ActionType.PlayRentCard,
+      playerId: "p1",
+      cardId: rentCard.id,
+      targetColor: PropertyColor.DarkBlue,
+    });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+
+    expect(r2.state.doubleRentActive).toBe(false);
+  });
+
+  it("should reject Double Rent when fewer than 2 actions remaining", () => {
+    const { state, doubleRentCard } = setupDoubleRentScenario();
+
+    // Burn 2 actions so only 1 remains
+    state.actionsRemaining = 1;
+
+    const result = applyAction(state, {
+      type: ActionType.PlayDoubleRent,
+      playerId: "p1",
+      cardId: doubleRentCard.id,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("at least 2 actions");
+    }
+  });
+});
+
 // ---- Helper Function Tests ----
 
 describe("Helpers", () => {

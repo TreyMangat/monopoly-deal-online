@@ -96,6 +96,7 @@ export function initializeGame(
     turnNumber: 1,
     winnerId: null,
     useDoubleDeck,
+    doubleRentActive: false,
   };
 
   // Auto-draw for the first player
@@ -374,7 +375,8 @@ function playRentCard(
     return { ok: false, error: "You have no properties of that color" };
   }
 
-  const rentAmount = calculateRent(group);
+  const doubled = state.doubleRentActive;
+  const rentAmount = calculateRent(group, doubled);
   if (rentAmount === 0) {
     return { ok: false, error: "Rent would be $0" };
   }
@@ -382,6 +384,7 @@ function playRentCard(
   removeCardFromHand(player, action.cardId);
   state.discardPile.push(card);
   consumePlay(state);
+  state.doubleRentActive = false;
 
   // Determine targets: 2-color rent = ALL players, wild rent = ONE player
   let targetIds: string[];
@@ -402,7 +405,7 @@ function playRentCard(
     respondedPlayerIds: [],
     amount: rentAmount,
     cardId: action.cardId,
-    isDoubled: false,
+    isDoubled: doubled,
   };
   state.phase = TurnPhase.AwaitingResponse;
 
@@ -730,9 +733,7 @@ function playDoubleRent(
   state.discardPile.push(card);
   consumePlay(state);
 
-  // We mark this via a temporary flag on the state
-  // The next rent card played will check for this
-  (state as any)._doubleRentActive = true;
+  state.doubleRentActive = true;
 
   const desc = `${player.name} played Double the Rent! Next rent is doubled`;
   return { ok: true, state, description: desc };

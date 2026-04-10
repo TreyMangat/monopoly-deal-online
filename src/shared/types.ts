@@ -138,6 +138,7 @@ export interface GameState {
   turnNumber: number;
   winnerId: string | null;
   useDoubleDeck: boolean; // true for 6 players
+  doubleRentActive: boolean; // set by Double Rent card, consumed by next rent play
 }
 
 // ---- Player Actions (client → server) ----

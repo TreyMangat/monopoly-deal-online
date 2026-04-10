@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: monopoly-deal-online
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server/index.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
