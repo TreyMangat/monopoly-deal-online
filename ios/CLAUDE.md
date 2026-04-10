@@ -27,6 +27,12 @@ ios/MonopolyDeal/
     CreateGameView.swift          → Name input, avatar picker, server URL, create button
     JoinGameView.swift            → Room code input, name, avatar, join button
     LobbyView.swift               → Player list, room code with copy, start game (host)
+    Cards/
+      CardView.swift              → Single card face: type badge, name, value, color dots, selected state
+      CardBackView.swift          → Face-down card back: branded pattern, no card info
+    GameBoard/
+      HandView.swift              → Horizontal ScrollView of hand cards, tappable when your turn
+      BankView.swift              → Bank total header + card chips, selectable in payment mode
   Utilities/
     CardDesignSystem.swift        → PropertyColor colors/names/setSizes, CardType display, CardStyleConfig, GameColors theme
 ```
@@ -64,11 +70,13 @@ ios/MonopolyDeal/
 - [x] Observable view model wiring events to UI state
 - [x] Main menu, create game, join game, lobby views
 - [x] Property color → SwiftUI color mapping
+- [x] Card view component (face + back, all card types, selected state)
+- [x] Hand view (scrollable, tappable, dimmed when not your turn)
+- [x] Bank view (total display, payment mode with selectable chips)
 
 ## What's Next
 
-- [ ] Game board view (hand, bank, properties, opponents)
-- [ ] Card detail view / card component
+- [ ] Game board view (properties, opponents, turn controls)
 - [ ] Action selection UI (play card, target player, pay debt)
 - [ ] Timer countdown display
 - [ ] Pending action response UI (pay, Just Say No, accept)
