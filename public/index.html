@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Monopoly Deal Online</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0a1628">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Monopoly Deal">
@@ -684,6 +684,67 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 #targetedFlash.active{animation:targetFlash .6s ease}
 @keyframes targetFlash{0%{opacity:1}100%{opacity:0}}
 
+/* ---- Steal Event Modal ---- */
+#stealModal{position:fixed;top:0;left:0;width:100%;height:100%;z-index:500;display:none;
+  justify-content:center;align-items:center;padding:16px;
+  background:rgba(5,12,30,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#stealModal.active{display:flex}
+#stealModal .steal-sheet{background:var(--surface-solid);border-radius:20px;width:100%;max-width:380px;
+  padding:24px 20px;border:2px solid rgba(220,38,38,.5);
+  box-shadow:0 0 40px rgba(220,38,38,.2),0 12px 40px rgba(0,0,0,.5);
+  animation:stealSlideIn .4s cubic-bezier(.32,.72,0,1)}
+@keyframes stealSlideIn{0%{opacity:0;transform:translateY(-40px) scale(.9)}100%{opacity:1;transform:translateY(0) scale(1)}}
+#stealModal .steal-sheet.pulse-border{animation:stealSlideIn .4s cubic-bezier(.32,.72,0,1),stealPulse 2s ease-in-out infinite .4s}
+@keyframes stealPulse{0%,100%{border-color:rgba(220,38,38,.4);box-shadow:0 0 20px rgba(220,38,38,.1)}
+  50%{border-color:rgba(220,38,38,.8);box-shadow:0 0 40px rgba(220,38,38,.3)}}
+.steal-header{text-align:center;margin-bottom:16px}
+.steal-attacker{font-size:20px;font-weight:700;color:var(--cream);font-family:'Fredoka',sans-serif}
+.steal-type{font-size:13px;font-weight:800;color:#ef4444;letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.steal-body{display:flex;justify-content:center;align-items:center;gap:12px;margin:16px 0;min-height:120px}
+.steal-card-display{display:flex;flex-direction:column;align-items:center;gap:4px}
+.steal-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.steal-card-label.take{color:#ef4444}
+.steal-card-label.give{color:var(--success)}
+.steal-card-wrap{width:80px;height:115px;border-radius:10px;overflow:hidden;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.15);
+  display:flex;flex-direction:column;animation:stealCardPop .3s cubic-bezier(.32,.72,0,1) both;
+  animation-delay:.3s}
+@keyframes stealCardPop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.steal-arrow{font-size:28px;color:var(--muted);animation:stealCardPop .3s ease both;animation-delay:.4s}
+.steal-set-fan{display:flex;justify-content:center;gap:0;animation:stealCardPop .3s ease both;animation-delay:.3s}
+.steal-set-fan .steal-card-wrap{width:60px;height:85px;margin-left:-16px;border-radius:8px}
+.steal-set-fan .steal-card-wrap:first-child{margin-left:0}
+.steal-set-label{font-size:22px;font-weight:800;text-align:center;color:#ef4444;
+  font-family:'Fredoka',sans-serif;letter-spacing:1px}
+.steal-desc{font-size:13px;color:var(--muted);text-align:center;margin-top:8px}
+.steal-buttons{display:flex;gap:10px;margin-top:20px}
+.steal-buttons button{flex:1;padding:14px;font-size:15px;font-weight:700;border-radius:50px}
+.steal-btn-jsn{background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;
+  box-shadow:0 4px 16px rgba(46,125,50,.3)}
+.steal-btn-accept{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+
+/* Screen shake */
+@keyframes screenShake{0%{transform:translateX(0)}20%{transform:translateX(-4px)}
+  40%{transform:translateX(4px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}100%{transform:translateX(0)}}
+.screen-shake{animation:screenShake .3s ease}
+
+/* Nope slam */
+.nope-slam{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+  font-size:60px;font-weight:900;color:#2E7D32;font-family:'Fredoka',sans-serif;
+  z-index:600;pointer-events:none;text-shadow:0 4px 20px rgba(46,125,50,.5);
+  letter-spacing:4px}
+.nope-slam.active{animation:nopeSlamAnim .6s cubic-bezier(.17,.67,.3,1.2) forwards}
+@keyframes nopeSlamAnim{0%{transform:translate(-50%,-50%) scale(0) rotate(-10deg);opacity:0}
+  40%{transform:translate(-50%,-50%) scale(1.3) rotate(2deg);opacity:1}
+  60%{transform:translate(-50%,-50%) scale(1) rotate(0deg);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(.8) rotate(0deg);opacity:0}}
+
+/* Steal success flash */
+.steal-success-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+  font-size:48px;font-weight:900;color:var(--gold-bright);font-family:'Fredoka',sans-serif;
+  z-index:600;pointer-events:none;text-shadow:0 4px 20px rgba(255,215,0,.5);letter-spacing:3px}
+.steal-success-text.active{animation:nopeSlamAnim .7s cubic-bezier(.17,.67,.3,1.2) forwards}
+
 /* Card fly animation */
 .hand-card.flying{position:fixed!important;z-index:999;transition:all .4s cubic-bezier(.32,.72,0,1)}
 
@@ -907,6 +968,9 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 <!-- Targeted Flash Overlay -->
 <div id="targetedFlash"></div>
+<div id="stealModal"><div class="steal-sheet pulse-border"><div class="steal-header"><div class="steal-attacker" id="stealAttacker"></div><div class="steal-type" id="stealType"></div></div><div class="steal-body" id="stealBody"></div><div class="steal-desc" id="stealDesc"></div><div class="steal-buttons" id="stealButtons"></div></div></div>
+<div class="nope-slam" id="nopeSlamText">NOPE!</div>
+<div class="steal-success-text" id="stealSuccessText">STEAL!</div>
 
 <!-- Connection Status Banner -->
 <div id="connStatus">Reconnecting...</div>
@@ -1202,6 +1266,18 @@ function sfxBuzzer() {
   initAudio();
   playTone(150, 0.15, 'square', 0.1);
   setTimeout(() => playTone(120, 0.2, 'square', 0.08), 100);
+}
+function sfxDanger() {
+  initAudio();
+  playTone(100, 0.2, 'sawtooth', 0.12);
+  setTimeout(() => playTone(80, 0.25, 'sawtooth', 0.15), 100);
+  setTimeout(() => playTone(60, 0.3, 'sawtooth', 0.1), 250);
+}
+function sfxStealSuccess() {
+  initAudio();
+  playTone(523, 0.1, 'sine', 0.1);
+  setTimeout(() => playTone(659, 0.1, 'sine', 0.12), 80);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.14), 160);
 }
 
 function toggleMute() {
@@ -1800,6 +1876,9 @@ function renderGame() {
   const gs = gameState;
   const myTurn = isMyTurn();
   const inDrawPhase = gs.phase === 'draw';
+
+  // Close steal modal if pending action resolved
+  if (gs.phase !== 'awaiting_response') closeStealModal();
 
   // Top bar
   const currentPlayerName = getCurrentTurnPlayerName();
@@ -2553,8 +2632,14 @@ function triggerActionAnimations(desc, action) {
     sfxJustSayNo();
   }
   if (d.includes('deal breaker') || d.includes('sly deal') || d.includes('forced deal')) {
-    animStealZoom();
-    sfxBuzzer();
+    // Check if WE played the steal action (success effect) vs being targeted (handled elsewhere)
+    const myName = gameState ? gameState.you.name : '';
+    if (myName && d.startsWith(myName.toLowerCase())) {
+      showStealSuccessEffect();
+    } else {
+      animStealZoom();
+      sfxBuzzer();
+    }
   }
   if (d.includes('birthday')) {
     animConfetti();
@@ -3025,7 +3110,18 @@ function handlePendingAction(pa) {
   if (!pa.targetPlayerIds.includes(myPlayerId)) return;
   if (pa.respondedPlayerIds && pa.respondedPlayerIds.includes(myPlayerId)) return;
 
-  flashTargeted();
+  const isSteal = ['respond_to_sly_deal', 'respond_to_forced_deal', 'respond_to_deal_breaker'].includes(pa.type);
+
+  if (isSteal) {
+    // Dramatic steal effects: red flash, screen shake, danger sound, vibrate
+    flashTargeted();
+    sfxDanger();
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    const gameEl = document.getElementById('game');
+    if (gameEl) { gameEl.classList.add('screen-shake'); setTimeout(() => gameEl.classList.remove('screen-shake'), 300); }
+  } else {
+    flashTargeted();
+  }
 
   if (pa.justSayNoChain && pa.justSayNoChain.length > 0) {
     showJSNChain(pa);
@@ -3038,8 +3134,8 @@ function handlePendingAction(pa) {
     return;
   }
 
-  if (['respond_to_sly_deal', 'respond_to_forced_deal', 'respond_to_deal_breaker'].includes(pa.type)) {
-    showStealResponseModal(pa);
+  if (isSteal) {
+    showStealModal(pa);
     return;
   }
 }
@@ -3148,30 +3244,140 @@ function confirmJSN(onConfirm) {
   ]);
 }
 
-// ---- Steal Response Modal ----
-function showStealResponseModal(pa) {
-  const hasJSN = gameState.you.hand.some(c => c.type === 'action_just_say_no');
-  const items = [
-    { label: 'Accept', action: () => { closePicker(); sendAction('accept_action'); } }
-  ];
-  if (hasJSN) {
-    items.unshift({
-      label: 'Just Say No!',
-      action: () => {
-        closePicker();
-        confirmJSN(() => {
-          const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
-          sendAction('play_just_say_no', { cardId: jsn.id });
-        });
-      }
-    });
+// ---- Steal Event Modal (dramatic) ----
+function showStealModal(pa) {
+  const modal = document.getElementById('stealModal');
+  const attackerName = getPlayerName(pa.fromPlayerId);
+  const attackerOpp = gameState.opponents.find(o => o.id === pa.fromPlayerId);
+  const isBot = attackerOpp && (roomBots.has(attackerOpp.id) || attackerOpp.avatar >= 10);
+
+  document.getElementById('stealAttacker').textContent = (isBot ? '\u{1F916} ' : '') + attackerName + ' is attacking you!';
+
+  const typeLabels = { respond_to_sly_deal:'SLY DEAL', respond_to_forced_deal:'FORCED DEAL', respond_to_deal_breaker:'DEAL BREAKER' };
+  document.getElementById('stealType').textContent = typeLabels[pa.type] || pa.type;
+
+  const body = document.getElementById('stealBody');
+  body.innerHTML = '';
+  const desc = document.getElementById('stealDesc');
+
+  if (pa.type === 'respond_to_sly_deal') {
+    // Find the targeted card
+    const targetCard = findCardInMyProperties(pa.targetCardId);
+    body.innerHTML = buildStealCardDisplay(targetCard, pa);
+    desc.textContent = targetCard ? `They want to take your ${targetCard.name}` : 'They want to steal one of your properties!';
+  } else if (pa.type === 'respond_to_forced_deal') {
+    const theirCard = findCardInOpponentProperties(pa.fromPlayerId, pa.offeredCardId);
+    const myCard = findCardInMyProperties(pa.requestedCardId);
+    body.innerHTML = `
+      <div class="steal-card-display"><div class="steal-card-label give">THEY GIVE</div>${buildMiniCardVisual(theirCard)}</div>
+      <div class="steal-arrow">&#8644;</div>
+      <div class="steal-card-display"><div class="steal-card-label take">THEY TAKE</div>${buildMiniCardVisual(myCard)}</div>`;
+    desc.textContent = 'They want to swap properties with you';
+  } else if (pa.type === 'respond_to_deal_breaker') {
+    const targetColor = pa.targetCardId; // stored as color string
+    const colorLabel = (COLOR_LABELS[targetColor] || targetColor || '').toUpperCase();
+    const myGroup = gameState.you.properties.find(g => g.color === targetColor);
+    let fanned = '';
+    if (myGroup) {
+      fanned = '<div class="steal-set-fan">';
+      myGroup.cards.forEach(c => { fanned += buildMiniCardVisual(c, targetColor); });
+      fanned += '</div>';
+      if (myGroup.hasHouse) fanned += ' <span style="font-size:20px">&#127968;</span>';
+      if (myGroup.hasHotel) fanned += ' <span style="font-size:20px">&#127960;</span>';
+    }
+    body.innerHTML = `<div style="text-align:center"><div class="steal-set-label">ENTIRE ${colorLabel} SET</div>${fanned}</div>`;
+    desc.textContent = `They want to steal your entire ${COLOR_LABELS[targetColor] || ''} set!`;
   }
-  const typeLabels = {
-    respond_to_sly_deal: 'Sly Deal',
-    respond_to_forced_deal: 'Forced Deal',
-    respond_to_deal_breaker: 'Deal Breaker'
-  };
-  openPicker(`Respond to ${typeLabels[pa.type] || pa.type}`, items);
+
+  // Buttons
+  const btns = document.getElementById('stealButtons');
+  btns.innerHTML = '';
+  const hasJSN = gameState.you.hand.some(c => c.type === 'action_just_say_no');
+  if (hasJSN) {
+    const jsnBtn = document.createElement('button');
+    jsnBtn.className = 'steal-btn-jsn';
+    jsnBtn.innerHTML = '&#9995; JUST SAY NO!';
+    jsnBtn.onclick = () => {
+      confirmJSN(() => {
+        const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
+        closeStealModal();
+        showNopeSlamEffect();
+        sendAction('play_just_say_no', { cardId: jsn.id });
+      });
+    };
+    btns.appendChild(jsnBtn);
+  }
+  const acceptBtn = document.createElement('button');
+  acceptBtn.className = 'steal-btn-accept';
+  acceptBtn.textContent = hasJSN ? 'Accept Loss' : 'Accept';
+  acceptBtn.onclick = () => { closeStealModal(); sendAction('accept_action'); };
+  btns.appendChild(acceptBtn);
+
+  modal.classList.add('active');
+}
+
+function closeStealModal() {
+  document.getElementById('stealModal').classList.remove('active');
+}
+
+function findCardInMyProperties(cardId) {
+  if (!cardId || !gameState) return null;
+  for (const g of gameState.you.properties) {
+    const c = g.cards.find(card => card.id === cardId);
+    if (c) return c;
+  }
+  return null;
+}
+
+function findCardInOpponentProperties(oppId, cardId) {
+  if (!cardId || !gameState) return null;
+  const opp = gameState.opponents.find(o => o.id === oppId);
+  if (!opp) return null;
+  for (const g of opp.properties) {
+    const c = g.cards.find(card => card.id === cardId);
+    if (c) return c;
+  }
+  return null;
+}
+
+function buildStealCardDisplay(card, pa) {
+  if (!card) return '<div class="steal-card-wrap" style="background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px">Property</div>';
+  return `<div class="steal-card-display"><div class="steal-card-label take">THEY TAKE</div>${buildMiniCardVisual(card)}</div>`;
+}
+
+function buildMiniCardVisual(card, overrideColor) {
+  if (!card) return '<div class="steal-card-wrap" style="background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px">Card</div>';
+  const color = overrideColor || card.color;
+  const bg = COLOR_HEX[color] || '#666';
+  const txt = isLightColor(color) ? '#222' : '#fff';
+  return `<div class="steal-card-wrap" style="background:var(--cream);border-color:rgba(0,0,0,.12)">
+    <div style="background:${bg};color:${txt};padding:4px;text-align:center;font-size:8px;font-weight:700;text-transform:uppercase">${COLOR_LABELS[color] || ''}</div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:4px;text-align:center;font-size:10px;font-weight:600;color:#333;word-break:break-word;line-height:1.2">${esc(card.name)}</div>
+    <div style="font-size:8px;text-align:center;padding:2px;color:#888">$${card.bankValue}M</div></div>`;
+}
+
+function showNopeSlamEffect() {
+  const el = document.getElementById('nopeSlamText');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  sfxJustSayNo();
+  setTimeout(() => el.classList.remove('active'), 700);
+}
+
+function showStealSuccessEffect() {
+  const el = document.getElementById('stealSuccessText');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  sfxStealSuccess();
+  // Gold flash
+  const flash = document.getElementById('targetedFlash');
+  flash.style.background = 'rgba(255,215,0,.25)';
+  flash.classList.remove('active');
+  void flash.offsetWidth;
+  flash.classList.add('active');
+  setTimeout(() => { flash.style.background = ''; el.classList.remove('active'); flash.classList.remove('active'); }, 700);
 }
 
 // ============================================================

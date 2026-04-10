@@ -2,7 +2,7 @@
 // Monopoly Deal Online — Service Worker (PWA offline support)
 // ============================================================
 
-const CACHE_NAME = 'monopoly-deal-v4';
+const CACHE_NAME = 'monopoly-deal-v5';
 
 const APP_SHELL = [
   '/',
