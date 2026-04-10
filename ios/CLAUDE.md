@@ -28,7 +28,7 @@ ios/MonopolyDeal/
     JoinGameView.swift            → Room code input, name, avatar, join button
     LobbyView.swift               → Player list, room code with copy, start game (host)
   Utilities/
-    ColorExtensions.swift         → PropertyColor → SwiftUI Color mapping
+    CardDesignSystem.swift        → PropertyColor colors/names/setSizes, CardType display, CardStyleConfig, GameColors theme
 ```
 
 ## Key Architecture Decisions
@@ -54,7 +54,7 @@ ios/MonopolyDeal/
 - Game actions flow through `GameViewModel` methods → `GameClient.sendAction()` → WebSocket
 - Server state updates arrive via `GameClient.events` → `GameViewModel.handleEvent()` → UI
 - Views observe `GameViewModel` via `@Environment(GameViewModel.self)`
-- PropertyColor display (Color, text color, display name) is in `ColorExtensions.swift`
+- PropertyColor display (Color, text color, display name) and card styling are in `CardDesignSystem.swift`
 
 ## What's Built
 
