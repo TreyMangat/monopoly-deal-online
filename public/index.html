@@ -128,29 +128,62 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
   overscroll-behavior-y:contain;position:relative;z-index:1}
 
 /* ============================================================
-   OPPONENTS — Mini card displays
+   OPPONENTS — Expanded card displays
    ============================================================ */
-.opponents{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;flex-shrink:0;
+.opponents{display:flex;gap:10px;padding:10px 12px;overflow-x:auto;flex-shrink:0;
   background:rgba(0,0,0,.15);-webkit-overflow-scrolling:touch;
-  border-bottom:1px solid rgba(0,0,0,.2)}
+  border-bottom:1px solid rgba(0,0,0,.2);scroll-snap-type:x proximity}
 .opponents::-webkit-scrollbar{display:none}
-.opp-card{background:rgba(0,0,0,.25);border-radius:10px;padding:10px;min-width:140px;flex-shrink:0;
-  font-size:11px;border:2px solid rgba(255,255,255,.08);
+.opp-card{background:rgba(0,0,0,.25);border-radius:12px;padding:12px;min-width:200px;flex-shrink:0;
+  font-size:12px;border:2px solid rgba(255,255,255,.08);cursor:pointer;
   -webkit-user-select:none;user-select:none;touch-action:manipulation;
-  backdrop-filter:blur(4px)}
+  backdrop-filter:blur(4px);scroll-snap-align:start;transition:transform .2s,border-color .3s}
+.opp-card:active{transform:scale(.97)}
 .opp-card.is-turn{border-color:var(--gold);box-shadow:0 0 12px var(--gold-dim)}
-.opp-card .opp-name{font-weight:700;font-size:13px;margin-bottom:4px;white-space:nowrap;overflow:hidden;
+.opp-card .opp-name{font-weight:700;font-size:15px;margin-bottom:4px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;color:var(--cream)}
-.opp-card .opp-hand{color:var(--muted);font-size:11px}
-.opp-card .opp-bank{color:var(--success);font-size:11px}
-.opp-props{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
-.opp-prop-stack{display:flex;position:relative;height:20px}
-.opp-prop-mini{width:14px;height:20px;border-radius:2px;border:1px solid rgba(255,255,255,.2);
+.opp-card .opp-stats{display:flex;gap:12px;margin-bottom:6px}
+.opp-card .opp-hand{color:var(--muted);font-size:12px}
+.opp-card .opp-bank{color:var(--success);font-size:14px;font-weight:700}
+.opp-props{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.opp-prop-stack{display:flex;align-items:center;position:relative;height:32px}
+.opp-prop-mini{width:22px;height:32px;border-radius:3px;border:1px solid rgba(255,255,255,.25);
   font-size:7px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;
-  margin-left:-4px;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  margin-left:-6px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.4);
+  text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .opp-prop-mini:first-child{margin-left:0}
-.opp-prop-stack.complete{outline:2px solid var(--gold);outline-offset:1px;border-radius:3px}
-.opp-prop-label{font-size:9px;color:var(--muted);margin-left:4px;display:flex;align-items:center}
+.opp-prop-mini .opm-name{font-size:5px;text-align:center;line-height:1;word-break:break-all;
+  overflow:hidden;max-height:28px;padding:1px}
+.opp-prop-stack.complete{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+.opp-prop-label{font-size:10px;color:var(--muted);margin-left:5px;display:flex;align-items:center;font-weight:600}
+
+/* ---- Opponent Overlay ---- */
+#oppOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);
+  z-index:350;display:none;justify-content:center;align-items:center;
+  opacity:0;transition:opacity .25s ease}
+#oppOverlay.active{display:flex;opacity:1}
+#oppOverlay .oo-sheet{background:var(--surface-solid);border-radius:16px;width:92%;max-width:420px;
+  max-height:80vh;overflow-y:auto;padding:20px;border:2px solid var(--wood);
+  transform:scale(.9);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+#oppOverlay.active .oo-sheet{transform:scale(1)}
+#oppOverlay .oo-name{font-size:20px;font-weight:700;color:var(--cream);margin-bottom:4px}
+#oppOverlay .oo-stats{display:flex;gap:16px;margin-bottom:16px;font-size:14px}
+#oppOverlay .oo-bank-detail{margin-bottom:16px}
+#oppOverlay .oo-bank-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#oppOverlay .oo-bank-chip{background:linear-gradient(135deg,#1a5c30,#0e3d20);padding:4px 10px;
+  border-radius:16px;font-size:12px;color:var(--success);font-weight:700;
+  border:1px solid rgba(39,174,96,.3)}
+#oppOverlay .oo-prop-group{background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-bottom:8px;
+  border:2px solid rgba(255,255,255,.06)}
+#oppOverlay .oo-prop-group.complete{border-color:var(--gold)}
+#oppOverlay .oo-pg-header{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}
+#oppOverlay .oo-pg-cards{display:flex;flex-wrap:wrap;gap:6px}
+#oppOverlay .oo-pg-card{width:60px;height:40px;border-radius:4px;border:1px solid rgba(0,0,0,.3);
+  display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:#fff;
+  text-align:center;padding:2px;box-shadow:0 1px 3px rgba(0,0,0,.3);
+  text-shadow:0 1px 1px rgba(0,0,0,.4);word-break:break-word;line-height:1.1}
+#oppOverlay .oo-close{margin-top:12px;width:100%;text-align:center;padding:12px;font-size:16px;
+  color:var(--teal);cursor:pointer;font-weight:600}
 
 /* ============================================================
    TABLE CENTER — Draw Pile & Discard Pile
@@ -325,8 +358,17 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
 .hand-card.card-action .hc-color-bar{background:rgba(255,255,255,.15)}
 
 /* ---- Rent Card ---- */
-.hand-card.card-rent{background:var(--cream);color:#333}
-.hand-card.card-rent .hc-footer{background:rgba(0,0,0,.06);color:#666}
+.hand-card.card-rent{background:linear-gradient(135deg,#4A154B,#7B2D8E);color:#fff;
+  border-color:rgba(123,45,142,.4);position:relative;overflow:hidden}
+.hand-card.card-rent .hc-footer{background:rgba(0,0,0,.2);color:rgba(255,255,255,.8)}
+.hand-card.card-rent .hc-name{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.hand-card.card-rent .hc-desc{color:rgba(255,255,255,.7)}
+.hand-card.card-rent .rent-watermark{position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%) rotate(-35deg);font-size:28px;font-weight:900;
+  color:rgba(255,255,255,.1);letter-spacing:2px;pointer-events:none;white-space:nowrap}
+.hand-card.card-rent .rent-banner{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+  background:rgba(255,255,255,.2);padding:2px 0;text-align:center;font-size:10px;font-weight:800;
+  letter-spacing:2px;color:#fff;backdrop-filter:blur(2px);pointer-events:none}
 
 /* Breathing animation for waiting state */
 .hand-area.waiting .hand-label{animation:breatheText 3s ease-in-out infinite}
@@ -491,12 +533,144 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
 #gameOver h1{font-size:32px;color:var(--gold-bright);text-shadow:0 2px 8px rgba(0,0,0,.5)}
 #gameOver .winner-sets{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
 
+/* ============================================================
+   TURN TIMER BAR
+   ============================================================ */
+.timer-wrap{display:flex;align-items:center;gap:6px;flex:1;max-width:180px;margin:0 8px}
+.timer-bar{flex:1;height:6px;background:rgba(0,0,0,.3);border-radius:3px;overflow:hidden;position:relative}
+.timer-fill{height:100%;border-radius:3px;transition:width .5s linear,background .3s;width:100%;
+  will-change:width}
+.timer-fill.teal{background:var(--teal)}
+.timer-fill.yellow{background:var(--warn)}
+.timer-fill.red{background:var(--accent);animation:timerPulse .5s ease-in-out infinite}
+.timer-secs{font-size:11px;color:var(--cream);font-weight:700;min-width:22px;text-align:right}
+@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ============================================================
+   MUTE BUTTON
+   ============================================================ */
+.mute-btn{background:none;color:var(--muted);font-size:16px;padding:2px 6px;min-width:28px;
+  border-radius:4px;transition:color .2s}
+.mute-btn.muted{color:var(--accent)}
+
+/* ============================================================
+   JOIN BUTTON STATE
+   ============================================================ */
+.btn-join{background:rgba(255,255,255,.08);color:#555;border:1px solid rgba(255,255,255,.1);
+  font-weight:600;transition:all .3s ease,transform .2s}
+.btn-join.ready{background:var(--teal);color:#fff;border-color:var(--teal);
+  box-shadow:0 2px 12px rgba(46,209,192,.3);animation:joinPop .3s cubic-bezier(.32,.72,0,1)}
+@keyframes joinPop{0%{transform:scale(.95)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+
+/* ============================================================
+   ANIMATIONS — GPU-accelerated
+   ============================================================ */
+
+/* Card draw: flip+fly from deck to hand */
+.anim-card-draw{position:fixed;z-index:999;pointer-events:none;
+  width:64px;height:90px;border-radius:6px;
+  background:linear-gradient(135deg,#8B0000,#A51010);
+  border:2px solid #600;box-shadow:0 4px 16px rgba(0,0,0,.5);
+  will-change:transform,opacity}
+.anim-card-draw.fly{transition:transform .5s cubic-bezier(.32,.72,0,1),opacity .5s ease}
+
+/* Card play: zoom+spin to center */
+.anim-card-play{position:fixed;z-index:999;pointer-events:none;
+  will-change:transform,opacity;
+  transition:transform .4s cubic-bezier(.32,.72,0,1),opacity .4s ease}
+
+/* Coin shower */
+.coin-particle{position:fixed;pointer-events:none;z-index:998;width:10px;height:10px;
+  border-radius:50%;background:var(--gold-bright);box-shadow:0 0 4px rgba(255,215,0,.5);
+  will-change:transform,opacity}
+
+/* Screen shake */
+@keyframes screenShake{
+  0%,100%{transform:translateX(0)}
+  10%{transform:translateX(-4px)}
+  20%{transform:translateX(4px)}
+  30%{transform:translateX(-3px)}
+  40%{transform:translateX(3px)}
+  50%{transform:translateX(-2px)}
+  60%{transform:translateX(2px)}
+  70%{transform:translateX(-1px)}
+  80%{transform:translateX(1px)}}
+.shake{animation:screenShake .4s ease}
+
+/* NOPE! text slam */
+.nope-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(3);
+  font-size:48px;font-weight:900;color:var(--accent);z-index:999;pointer-events:none;
+  text-shadow:0 4px 20px rgba(233,69,96,.6);opacity:0;
+  will-change:transform,opacity}
+.nope-text.slam{animation:nopeSlamIn .6s cubic-bezier(.32,.72,0,1) forwards}
+@keyframes nopeSlamIn{
+  0%{transform:translate(-50%,-50%) scale(3);opacity:0}
+  30%{transform:translate(-50%,-50%) scale(1);opacity:1}
+  70%{transform:translate(-50%,-50%) scale(1);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(1.2);opacity:0}}
+
+/* Fireworks burst (CSS particles) */
+.firework-container{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:997}
+.firework-particle{position:absolute;width:6px;height:6px;border-radius:50%;
+  will-change:transform,opacity;animation:fireworkBurst .8s ease-out forwards}
+@keyframes fireworkBurst{
+  0%{transform:translate(0,0) scale(1);opacity:1}
+  100%{opacity:0}}
+
+/* Gold flash for set complete */
+.gold-flash{position:fixed;top:0;left:0;width:100%;height:100%;
+  background:radial-gradient(circle,rgba(255,215,0,.25),transparent 70%);
+  pointer-events:none;z-index:996;opacity:0;will-change:opacity}
+.gold-flash.active{animation:goldFlashAnim .6s ease-out}
+@keyframes goldFlashAnim{0%{opacity:1}100%{opacity:0}}
+
+/* Confetti particles (birthday) */
+.confetti-particle{position:fixed;pointer-events:none;z-index:998;width:8px;height:12px;
+  will-change:transform,opacity}
+
+/* Your Turn banner slide */
+.turn-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(-20px);
+  background:linear-gradient(135deg,rgba(201,169,78,.95),rgba(161,129,38,.95));
+  color:#1a1a1a;padding:12px 32px;border-radius:12px;font-size:20px;font-weight:800;
+  z-index:500;pointer-events:none;opacity:0;will-change:transform,opacity;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);letter-spacing:1px}
+.turn-banner.show{animation:turnBannerAnim 1.8s cubic-bezier(.32,.72,0,1) forwards}
+@keyframes turnBannerAnim{
+  0%{opacity:0;transform:translate(-50%,-50%) translateY(20px) scale(.8)}
+  15%{opacity:1;transform:translate(-50%,-50%) translateY(0) scale(1)}
+  70%{opacity:1;transform:translate(-50%,-50%) translateY(0) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-50%) translateY(-20px) scale(.9)}}
+
+/* Steal dramatic zoom */
+.steal-zoom{position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:996;opacity:0;
+  background:radial-gradient(circle,rgba(233,69,96,.15),transparent 60%);will-change:opacity}
+.steal-zoom.active{animation:stealZoomAnim .5s ease-out}
+@keyframes stealZoomAnim{0%{opacity:1;transform:scale(1.05)}100%{opacity:0;transform:scale(1)}}
+
+/* Hand idle floating */
+.hand-cards.idle .hand-card{animation:cardFloat 3s ease-in-out infinite}
+.hand-cards.idle .hand-card:nth-child(2n){animation-delay:.5s}
+.hand-cards.idle .hand-card:nth-child(3n){animation-delay:1s}
+.hand-cards.idle .hand-card:nth-child(4n){animation-delay:1.5s}
+@keyframes cardFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-3px)}}
+
+/* Waiting pulse */
+.hand-cards.waiting-pulse .hand-card{animation:cardBreathe 3s ease-in-out infinite}
+.hand-cards.waiting-pulse .hand-card:nth-child(2n){animation-delay:.4s}
+.hand-cards.waiting-pulse .hand-card:nth-child(3n){animation-delay:.8s}
+@keyframes cardBreathe{
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(.98);opacity:.85}}
+
 /* ---- Mobile-specific (small phones) ---- */
 @media(max-width:374px){
   .hand-card{min-width:62px;max-width:78px;min-height:96px}
   .hand-card .hc-name{font-size:9px}
   .hand-card .hc-badge{font-size:7px}
-  .opp-card{min-width:120px;padding:8px}
+  .opp-card{min-width:160px;padding:8px}
   .table-center{gap:16px;padding:12px 8px}
   .draw-pile-stack,.card-back{width:54px;height:76px}
   .discard-card{width:54px;height:76px}
@@ -524,7 +698,7 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
     <button class="btn-primary" onclick="createRoom()">Create Room</button>
     <div class="row">
       <input id="codeInput" placeholder="Room code" maxlength="6" autocomplete="off" style="text-transform:uppercase">
-      <button class="btn-secondary" onclick="joinRoom()">Join</button>
+      <button class="btn-join" id="joinBtn" onclick="joinRoom()" disabled>Join</button>
     </div>
   </div>
   <button id="settingsBtn" onclick="toggleSettings()">&#9881;</button>
@@ -561,8 +735,13 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
   <!-- Top Bar — wood grain -->
   <div class="top-bar">
     <span class="turn-info" id="turnInfo">Turn 1</span>
+    <div class="timer-wrap" id="timerWrap" style="display:none">
+      <div class="timer-bar"><div class="timer-fill teal" id="timerFill"></div></div>
+      <span class="timer-secs" id="timerSecs">60</span>
+    </div>
     <span class="actions-left" id="actionsLeft">3 actions left</span>
     <span class="pile-info" id="pileInfo">Deck: 0</span>
+    <button class="mute-btn" id="muteBtn" onclick="toggleMute()" title="Toggle sound">&#128266;</button>
   </div>
 
   <!-- Scrollable middle -->
@@ -652,6 +831,15 @@ input:focus{outline:2px solid var(--gold);border-color:var(--gold)}
 <!-- JSN Chain Modal -->
 <div id="jsnModal"><div class="modal"><h3>Just Say No!</h3><div class="chain-history" id="jsnChain"></div><div class="pay-btn-row" style="margin-top:12px"><button class="btn-primary" id="jsnCounterBtn" onclick="counterJSN()" style="flex:1">Counter with Just Say No</button><button class="btn-secondary" onclick="acceptJSN()" style="flex:1">Accept</button></div></div></div>
 
+<!-- Opponent Overlay -->
+<div id="oppOverlay" onclick="closeOppOverlay(event)">
+  <div class="oo-sheet" id="oppOverlaySheet"></div>
+</div>
+
+<!-- Animation containers -->
+<div id="goldFlash" class="gold-flash"></div>
+<div id="stealZoom" class="steal-zoom"></div>
+
 <!-- ============ GAME OVER ============ -->
 <div id="gameOver" class="screen">
   <h1 id="winnerText">Player Wins!</h1>
@@ -674,6 +862,307 @@ let selectedCardId = null;
 let actionLogs = [];
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+
+// Track previous turn for animation triggers
+let prevTurnNumber = 0;
+let prevPhase = '';
+let prevPendingAction = null;
+
+// ============================================================
+// SOUND SYSTEM — Web Audio API (no files needed)
+// ============================================================
+let audioCtx = null;
+let soundMuted = false;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.15) {
+  if (soundMuted || !audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+
+function sfxCardPlay() {
+  initAudio();
+  playTone(800, 0.08, 'square', 0.1);
+  setTimeout(() => playTone(1200, 0.05, 'square', 0.08), 40);
+}
+function sfxDraw() {
+  initAudio();
+  playTone(400, 0.1, 'sawtooth', 0.06);
+  setTimeout(() => playTone(600, 0.1, 'sawtooth', 0.06), 60);
+  setTimeout(() => playTone(800, 0.08, 'sawtooth', 0.05), 120);
+}
+function sfxMoney() {
+  initAudio();
+  playTone(1400, 0.06, 'sine', 0.1);
+  setTimeout(() => playTone(1800, 0.08, 'sine', 0.12), 80);
+  setTimeout(() => playTone(2200, 0.1, 'sine', 0.08), 160);
+}
+function sfxJustSayNo() {
+  initAudio();
+  playTone(200, 0.3, 'sawtooth', 0.15);
+  setTimeout(() => playTone(150, 0.4, 'sawtooth', 0.12), 150);
+}
+function sfxSetComplete() {
+  initAudio();
+  [523, 659, 784, 1047].forEach((f, i) => {
+    setTimeout(() => playTone(f, 0.2, 'sine', 0.12), i * 100);
+  });
+}
+function sfxYourTurn() {
+  initAudio();
+  playTone(659, 0.12, 'sine', 0.1);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 120);
+}
+function sfxBuzzer() {
+  initAudio();
+  playTone(150, 0.15, 'square', 0.1);
+  setTimeout(() => playTone(120, 0.2, 'square', 0.08), 100);
+}
+
+function toggleMute() {
+  soundMuted = !soundMuted;
+  const btn = document.getElementById('muteBtn');
+  btn.innerHTML = soundMuted ? '&#128264;' : '&#128266;';
+  btn.classList.toggle('muted', soundMuted);
+}
+
+// ============================================================
+// TURN TIMER
+// ============================================================
+let timerInterval = null;
+let timerEnd = 0;
+let timerDuration = 60;
+
+function startTimer(seconds) {
+  clearInterval(timerInterval);
+  timerDuration = seconds;
+  timerEnd = Date.now() + seconds * 1000;
+  document.getElementById('timerWrap').style.display = '';
+  updateTimerDisplay();
+  timerInterval = setInterval(updateTimerDisplay, 500);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('timerWrap').style.display = 'none';
+}
+
+function updateTimerDisplay() {
+  const remaining = Math.max(0, (timerEnd - Date.now()) / 1000);
+  const pct = (remaining / timerDuration) * 100;
+  const fill = document.getElementById('timerFill');
+  const secs = document.getElementById('timerSecs');
+  fill.style.width = pct + '%';
+  secs.textContent = Math.ceil(remaining);
+  fill.className = 'timer-fill ' + (remaining > 30 ? 'teal' : remaining > 10 ? 'yellow' : 'red');
+  if (remaining <= 0) stopTimer();
+}
+
+// ============================================================
+// ANIMATIONS
+// ============================================================
+function animCardDraw(count) {
+  const drawPile = document.getElementById('drawPile');
+  const handArea = document.getElementById('handArea');
+  const startRect = drawPile.getBoundingClientRect();
+  const endRect = handArea.getBoundingClientRect();
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const card = document.createElement('div');
+      card.className = 'anim-card-draw';
+      card.style.left = (startRect.left + startRect.width/2 - 32) + 'px';
+      card.style.top = (startRect.top + startRect.height/2 - 45) + 'px';
+      card.style.transform = 'rotateY(180deg) scale(.8)';
+      card.style.opacity = '1';
+      document.body.appendChild(card);
+
+      requestAnimationFrame(() => {
+        card.classList.add('fly');
+        card.style.left = (endRect.left + 40 + i * 30) + 'px';
+        card.style.top = (endRect.top) + 'px';
+        card.style.transform = 'rotateY(0deg) scale(1)';
+        card.style.opacity = '0.3';
+      });
+
+      setTimeout(() => card.remove(), 550);
+    }, i * 150);
+  }
+}
+
+function animCardPlay(cardEl) {
+  if (!cardEl) return;
+  const rect = cardEl.getBoundingClientRect();
+  const clone = cardEl.cloneNode(true);
+  clone.className = 'anim-card-play';
+  clone.style.left = rect.left + 'px';
+  clone.style.top = rect.top + 'px';
+  clone.style.width = rect.width + 'px';
+  clone.style.height = rect.height + 'px';
+  clone.style.opacity = '1';
+  document.body.appendChild(clone);
+
+  requestAnimationFrame(() => {
+    const cx = window.innerWidth / 2 - rect.width / 2;
+    const cy = window.innerHeight / 2 - rect.height / 2;
+    clone.style.left = cx + 'px';
+    clone.style.top = cy + 'px';
+    clone.style.transform = 'scale(1.3) rotate(360deg)';
+    clone.style.opacity = '0';
+  });
+
+  setTimeout(() => clone.remove(), 450);
+}
+
+function animCoinShower() {
+  const count = 15;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const coin = document.createElement('div');
+      coin.className = 'coin-particle';
+      coin.style.left = (Math.random() * 60 + 20) + '%';
+      coin.style.top = '-10px';
+      coin.style.opacity = '1';
+      const size = 6 + Math.random() * 8;
+      coin.style.width = size + 'px';
+      coin.style.height = size + 'px';
+      document.body.appendChild(coin);
+
+      const endY = window.innerHeight + 20;
+      const drift = (Math.random() - 0.5) * 100;
+      coin.style.transition = `transform ${0.6 + Math.random() * 0.4}s ease-in, opacity 0.3s ease ${0.4 + Math.random() * 0.3}s`;
+      requestAnimationFrame(() => {
+        coin.style.transform = `translateY(${endY}px) translateX(${drift}px) rotate(${Math.random()*360}deg)`;
+        coin.style.opacity = '0';
+      });
+
+      setTimeout(() => coin.remove(), 1200);
+    }, i * 40);
+  }
+}
+
+function animScreenShake() {
+  const game = document.getElementById('game');
+  game.classList.remove('shake');
+  void game.offsetWidth;
+  game.classList.add('shake');
+  setTimeout(() => game.classList.remove('shake'), 400);
+}
+
+function animRedFlash() {
+  const el = document.getElementById('targetedFlash');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 600);
+}
+
+function animNope() {
+  const nope = document.createElement('div');
+  nope.className = 'nope-text';
+  nope.textContent = 'NOPE!';
+  document.body.appendChild(nope);
+  requestAnimationFrame(() => nope.classList.add('slam'));
+  setTimeout(() => nope.remove(), 700);
+}
+
+function animFireworks(x, y) {
+  const container = document.createElement('div');
+  container.className = 'firework-container';
+  document.body.appendChild(container);
+  const colors = ['#FFD700','#FF6347','#00CED1','#FF69B4','#7CFC00','#FF8C00'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'firework-particle';
+    p.style.left = (x || window.innerWidth / 2) + 'px';
+    p.style.top = (y || window.innerHeight / 2) + 'px';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (Math.PI * 2 / 30) * i;
+    const dist = 60 + Math.random() * 80;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    p.style.animationDuration = (0.5 + Math.random() * 0.4) + 's';
+    p.style.setProperty('--dx', dx + 'px');
+    p.style.setProperty('--dy', dy + 'px');
+    // Inline the end transform since CSS custom properties in keyframes are limited
+    p.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px,${dy}px) scale(0.3)`, opacity: 0 }
+    ], { duration: 500 + Math.random() * 400, easing: 'ease-out' });
+    container.appendChild(p);
+  }
+  // Gold flash
+  const gf = document.getElementById('goldFlash');
+  gf.classList.remove('active');
+  void gf.offsetWidth;
+  gf.classList.add('active');
+  setTimeout(() => { gf.classList.remove('active'); container.remove(); }, 900);
+}
+
+function animConfetti() {
+  const count = 40;
+  const colors = ['#FFD700','#FF6347','#00CED1','#FF69B4','#7CFC00','#9B59B6','#FF8C00','#fff'];
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'confetti-particle';
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.top = '-12px';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.opacity = '1';
+      p.style.borderRadius = Math.random() > 0.5 ? '50%' : '1px';
+      const w = 5 + Math.random() * 6;
+      p.style.width = w + 'px';
+      p.style.height = (w * (1 + Math.random())) + 'px';
+      document.body.appendChild(p);
+
+      const duration = 1500 + Math.random() * 1000;
+      const drift = (Math.random() - 0.5) * 200;
+      const spin = (Math.random() - 0.5) * 720;
+      p.animate([
+        { transform: 'translateY(0) translateX(0) rotate(0deg)', opacity: 1 },
+        { transform: `translateY(${window.innerHeight + 20}px) translateX(${drift}px) rotate(${spin}deg)`, opacity: 0.3 }
+      ], { duration, easing: 'ease-in' });
+
+      setTimeout(() => p.remove(), duration);
+    }, i * 30);
+  }
+}
+
+function animTurnBanner(text) {
+  const existing = document.querySelector('.turn-banner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.className = 'turn-banner';
+  banner.textContent = text;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add('show'));
+  setTimeout(() => banner.remove(), 1900);
+}
+
+function animStealZoom() {
+  const el = document.getElementById('stealZoom');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 500);
+}
 
 // Color mapping
 const COLOR_CSS = {
@@ -819,8 +1308,10 @@ function handleMessage(msg) {
     case 'game_state_update':
       gameState = msg.payload.state;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
-        addLog(msg.payload.lastAction.description);
-        showActionToast(msg.payload.lastAction.description);
+        const desc = msg.payload.lastAction.description;
+        addLog(desc);
+        showActionToast(desc);
+        triggerActionAnimations(desc, msg.payload.lastAction);
       }
       renderGame();
       showScreen('game');
@@ -955,6 +1446,34 @@ function renderGame() {
   if (!myTurn) handArea.classList.add('waiting');
   else handArea.classList.remove('waiting');
 
+  // Hand idle float & waiting pulse
+  const handCardsEl = document.getElementById('handCards');
+  handCardsEl.classList.toggle('idle', myTurn && gs.phase === 'play');
+  handCardsEl.classList.toggle('waiting-pulse', !myTurn);
+
+  // Timer management
+  if (myTurn && (gs.phase === 'play' || gs.phase === 'draw')) {
+    if (prevPhase !== gs.phase || prevTurnNumber !== gs.turnNumber) {
+      startTimer(60);
+    }
+  } else if (gs.phase === 'awaiting_response' && gs.pendingAction &&
+             gs.pendingAction.targetPlayerIds.includes(myPlayerId)) {
+    if (prevPhase !== 'awaiting_response') {
+      startTimer(30);
+    }
+  } else {
+    stopTimer();
+  }
+
+  // Animation triggers based on state changes
+  if (gs.turnNumber !== prevTurnNumber && gs.currentPlayerIndex === gs.yourPlayerIndex) {
+    animTurnBanner('Your Turn!');
+    sfxYourTurn();
+  }
+
+  prevTurnNumber = gs.turnNumber;
+  prevPhase = gs.phase;
+
   // Payment modal
   if (gs.phase === 'awaiting_response' && gs.pendingAction) {
     handlePendingAction(gs.pendingAction);
@@ -1054,6 +1573,8 @@ function clickDrawPile() {
   if (!isMyTurn()) { toast("Not your turn"); return; }
   if (gameState.phase !== 'draw') { toast("Already drew cards"); return; }
   haptic('medium');
+  sfxDraw();
+  animCardDraw(gameState.you.hand.length === 0 ? 5 : 2);
   sendAction('draw_cards');
 }
 
@@ -1082,26 +1603,88 @@ function renderOpponents() {
       opp.properties.forEach(g => {
         const complete = g.cards.length >= (SET_SIZES[g.color] || 3);
         const bgColor = COLOR_HEX[g.color] || '#666';
+        const txtColor = isLightColor(g.color) ? '#222' : '#fff';
         propsHtml += `<div class="opp-prop-stack${complete ? ' complete' : ''}">`;
         g.cards.forEach((c, ci) => {
-          propsHtml += `<div class="opp-prop-mini" style="background:${bgColor};z-index:${ci}" title="${esc(c.name)}"></div>`;
+          const initials = c.name.split(' ').map(w => w[0]).join('');
+          propsHtml += `<div class="opp-prop-mini" style="background:${bgColor};z-index:${ci};color:${txtColor}" title="${esc(c.name)}"><span class="opm-name">${esc(initials)}</span></div>`;
         });
         propsHtml += `<span class="opp-prop-label">${g.cards.length}/${SET_SIZES[g.color] || '?'}</span></div>`;
       });
-      if (opp.properties.some(g => g.hasHouse)) propsHtml += ' <span style="font-size:12px" title="House">&#127968;</span>';
-      if (opp.properties.some(g => g.hasHotel)) propsHtml += ' <span style="font-size:12px" title="Hotel">&#127960;</span>';
+      if (opp.properties.some(g => g.hasHouse)) propsHtml += ' <span style="font-size:14px" title="House">&#127968;</span>';
+      if (opp.properties.some(g => g.hasHotel)) propsHtml += ' <span style="font-size:14px" title="Hotel">&#127960;</span>';
       propsHtml += '</div>';
     }
 
     const bankTotal = opp.bank ? opp.bank.reduce((s, c) => s + c.bankValue, 0) : 0;
+    const bankCount = opp.bank ? opp.bank.length : 0;
     div.innerHTML = `
       <div class="opp-name">${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
-      <div class="opp-hand">&#127183; ${opp.handCount} cards</div>
-      <div class="opp-bank">&#128176; $${bankTotal}M</div>
+      <div class="opp-stats">
+        <span class="opp-hand">&#127183; ${opp.handCount} cards</span>
+        <span class="opp-bank">&#128176; $${bankTotal}M (${bankCount})</span>
+      </div>
       ${propsHtml}
     `;
+    div.addEventListener('click', (e) => { e.stopPropagation(); showOppOverlay(opp); });
     strip.appendChild(div);
   });
+}
+
+// ---- Opponent Overlay ----
+function showOppOverlay(opp) {
+  const sheet = document.getElementById('oppOverlaySheet');
+  const bankTotal = opp.bank ? opp.bank.reduce((s, c) => s + c.bankValue, 0) : 0;
+
+  let bankChips = '';
+  if (opp.bank && opp.bank.length > 0) {
+    bankChips = '<div class="oo-bank-chips">' +
+      opp.bank.map(c => `<span class="oo-bank-chip">$${c.bankValue}M</span>`).join('') +
+      '</div>';
+  }
+
+  let propsHtml = '';
+  if (opp.properties && opp.properties.length > 0) {
+    opp.properties.forEach(g => {
+      const complete = g.cards.length >= (SET_SIZES[g.color] || 3);
+      const bgColor = COLOR_HEX[g.color] || '#666';
+      const txtColor = isLightColor(g.color) ? '#222' : '#fff';
+      propsHtml += `<div class="oo-prop-group${complete ? ' complete' : ''}">
+        <div class="oo-pg-header">
+          <span style="color:${bgColor};font-weight:700">${COLOR_LABELS[g.color] || g.color}</span>
+          <span style="color:${complete ? 'var(--gold-bright)' : 'var(--muted)'}">${g.cards.length}/${SET_SIZES[g.color] || '?'}${complete ? ' &#10003;' : ''}</span>
+        </div>
+        <div class="oo-pg-cards">
+          ${g.cards.map(c => `<div class="oo-pg-card" style="background:${bgColor};color:${txtColor}">${esc(c.name)}</div>`).join('')}
+        </div>
+        ${g.hasHouse ? '<div style="font-size:12px;margin-top:4px">&#127968; House</div>' : ''}
+        ${g.hasHotel ? '<div style="font-size:12px;margin-top:4px">&#127960; Hotel</div>' : ''}
+      </div>`;
+    });
+  } else {
+    propsHtml = '<div style="color:var(--muted);font-style:italic;padding:8px 0">No properties</div>';
+  }
+
+  sheet.innerHTML = `
+    <div class="oo-name">${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:13px">(offline)</span>' : ''}</div>
+    <div class="oo-stats">
+      <span style="color:var(--muted)">&#127183; ${opp.handCount} cards</span>
+      <span style="color:var(--success);font-weight:700">&#128176; $${bankTotal}M</span>
+    </div>
+    <div class="oo-bank-detail">
+      <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px">Bank</div>
+      ${bankChips || '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
+    </div>
+    <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Properties</div>
+    ${propsHtml}
+    <div class="oo-close" onclick="closeOppOverlay()">Close</div>
+  `;
+  document.getElementById('oppOverlay').classList.add('active');
+}
+
+function closeOppOverlay(e) {
+  if (e && e.target !== document.getElementById('oppOverlay')) return;
+  document.getElementById('oppOverlay').classList.remove('active');
 }
 
 // ============================================================
@@ -1272,16 +1855,19 @@ function buildCardHTML(card) {
     `;
   }
 
-  // Rent card — split color
+  // Rent card — distinctive bold look with watermark
   if (t === 'rent_two_color' && card.rentColors) {
     const c1 = COLOR_HEX[card.rentColors[0]] || '#666';
     const c2 = COLOR_HEX[card.rentColors[1]] || '#666';
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
-      <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2}">RENT</div>
-      <div class="hc-body">
-        <div class="hc-name" style="color:#333">${esc(card.name)}</div>
-        <div class="hc-desc" style="color:#666">${card.rentColors.map(c => COLOR_LABELS[c]).join(' / ')}</div>
+      <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2};font-weight:800">&#128176; RENT</div>
+      <div class="rent-watermark">RENT</div>
+      <div class="rent-banner">RENT</div>
+      <div class="hc-body" style="position:relative;z-index:1">
+        <div style="font-size:16px">&#128176;</div>
+        <div class="hc-name">${esc(card.name)}</div>
+        <div class="hc-desc">${card.rentColors.map(c => COLOR_LABELS[c]).join(' / ')}</div>
       </div>
       <div class="hc-footer">Rent Card</div>
     `;
@@ -1290,10 +1876,13 @@ function buildCardHTML(card) {
   if (t === 'rent_wild') {
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
-      <div class="hc-color-bar" style="background:linear-gradient(90deg,#DC143C,#FF8C00,#228B22,#00008B);color:#fff">RENT</div>
-      <div class="hc-body">
-        <div class="hc-name" style="color:#333">${esc(card.name)}</div>
-        <div class="hc-desc" style="color:#666">Any color</div>
+      <div class="hc-color-bar" style="background:linear-gradient(90deg,#DC143C,#FF8C00,#228B22,#00008B);color:#fff;font-weight:800">&#128176; RENT</div>
+      <div class="rent-watermark">RENT</div>
+      <div class="rent-banner">RENT</div>
+      <div class="hc-body" style="position:relative;z-index:1">
+        <div style="font-size:16px">&#128176;</div>
+        <div class="hc-name">${esc(card.name)}</div>
+        <div class="hc-desc">Any color</div>
       </div>
       <div class="hc-footer">Wild Rent</div>
     `;
@@ -1424,19 +2013,60 @@ function flyCard(cardEl, callback) {
   clone.style.margin = '0';
   document.body.appendChild(clone);
 
+  sfxCardPlay();
+
   requestAnimationFrame(() => {
     const cx = window.innerWidth / 2 - rect.width / 2;
     const cy = window.innerHeight / 2 - rect.height / 2;
     clone.style.left = cx + 'px';
     clone.style.top = cy + 'px';
-    clone.style.transform = 'scale(1.2)';
-    clone.style.opacity = '0.6';
+    clone.style.transform = 'scale(1.3) rotate(360deg)';
+    clone.style.opacity = '0';
   });
 
   setTimeout(() => {
     clone.remove();
     if (callback) callback();
-  }, 400);
+  }, 450);
+}
+
+// ============================================================
+// ACTION ANIMATION TRIGGERS
+// ============================================================
+function triggerActionAnimations(desc, action) {
+  const d = desc.toLowerCase();
+  if (d.includes('drew') || d.includes('draw')) {
+    sfxDraw();
+    animCardDraw(2);
+  }
+  if (d.includes('banked') || d.includes('bank')) {
+    sfxMoney();
+    animCoinShower();
+  }
+  if (d.includes('rent') && !d.includes('double rent')) {
+    animScreenShake();
+    animRedFlash();
+    sfxBuzzer();
+  }
+  if (d.includes('just say no')) {
+    animNope();
+    sfxJustSayNo();
+  }
+  if (d.includes('deal breaker') || d.includes('sly deal') || d.includes('forced deal')) {
+    animStealZoom();
+    sfxBuzzer();
+  }
+  if (d.includes('birthday')) {
+    animConfetti();
+    sfxMoney();
+  }
+  if (d.includes('complete') || d.includes('wins')) {
+    animFireworks();
+    sfxSetComplete();
+  }
+  if (d.includes('played') && !d.includes('bank') && !d.includes('rent') && !d.includes('just say no')) {
+    sfxCardPlay();
+  }
 }
 
 // ============================================================
@@ -1463,19 +2093,13 @@ function getActionsForCard(card) {
   }
   else if (t === 'property') {
     items.push({ label: `Play to ${COLOR_LABELS[card.color] || card.color}`, action: () => playProperty(card, card.color), flies: true });
-    items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'property_wild') {
     if (card.color) items.push({ label: `Play as ${COLOR_LABELS[card.color]}`, action: () => playProperty(card, card.color), flies: true });
     if (card.altColor) items.push({ label: `Play as ${COLOR_LABELS[card.altColor]}`, action: () => playProperty(card, card.altColor), flies: true });
-    items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'property_wild_all') {
     items.push({ label: 'Play to color...', action: () => pickColorForWild(card) });
-    items.push({ divider: true });
-    items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_pass_go') {
     items.push({ label: 'Play (draw 2)', action: () => playPassGo(card), flies: true });
@@ -2058,6 +2682,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeActionPanel();
     closePicker();
+    closeOppOverlay();
     document.getElementById('jsnModal').classList.remove('active');
     document.getElementById('paymentModal').classList.remove('active');
   }
@@ -2074,6 +2699,23 @@ document.getElementById('nameInput').addEventListener('keydown', e => {
     else document.getElementById('codeInput').focus();
   }
 });
+
+// Join button enable/disable based on 6-char room code
+document.getElementById('codeInput').addEventListener('input', e => {
+  const val = e.target.value.trim();
+  const btn = document.getElementById('joinBtn');
+  if (val.length === 6) {
+    btn.disabled = false;
+    btn.classList.add('ready');
+  } else {
+    btn.disabled = true;
+    btn.classList.remove('ready');
+  }
+});
+
+// Init audio context on first user interaction
+document.addEventListener('click', () => initAudio(), { once: true });
+document.addEventListener('touchstart', () => initAudio(), { once: true });
 
 // Init ws url display
 document.getElementById('wsUrlInput').value = getWsUrl();
