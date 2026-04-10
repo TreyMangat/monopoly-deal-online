@@ -928,13 +928,16 @@ function handlePayment(
   for (const card of paidCards) {
     if (
       card.type === CardType.Property ||
-      card.type === CardType.PropertyWild ||
-      card.type === CardType.PropertyWildAll
+      card.type === CardType.PropertyWild
     ) {
       // Property cards go to the collector's property area
-      const color = card.color || PropertyColor.Brown; // default for wild-all
+      // 2-color wilds go to their primary color
+      const color = card.color!;
       const group = getOrCreatePropertyGroup(fromPlayer, color);
       group.cards.push(card);
+    } else if (card.type === CardType.PropertyWildAll) {
+      // Rainbow wilds have no correct color — go to bank
+      fromPlayer.bank.push(card);
     } else {
       // Money and action cards go to the collector's bank
       fromPlayer.bank.push(card);

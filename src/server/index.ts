@@ -20,9 +20,17 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 // ---- Create HTTP Server ----
 
 const httpServer = http.createServer((req, res) => {
-  // CORS headers for health checks
+  // CORS headers on all responses for cross-origin WebSocket upgrades
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   if (req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -77,6 +85,17 @@ wss.on("connection", (ws: WebSocket) => {
   });
 
   ws.on("message", (data) => {
+    // Rate limiting: max 10 messages per second
+    if (!roomManager.checkRateLimit(ws)) {
+      ws.send(
+        serverMsg(ServerMessageType.Error, {
+          code: "RATE_LIMITED",
+          message: "Too many messages. Max 10 per second.",
+        })
+      );
+      return;
+    }
+
     const raw = data.toString();
     const msg = parseClientMsg(raw);
 

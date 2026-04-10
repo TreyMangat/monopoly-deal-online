@@ -11,15 +11,26 @@ import {
   GameState,
   PlayerState,
   PlayerAction,
+  ActionType,
   TurnPhase,
   RoomStatus,
   RoomInfo,
   ClientGameState,
   OpponentView,
   ServerMessageType,
+  PendingActionType,
   Card,
 } from "../shared/types";
-import { MAX_PLAYERS, MIN_PLAYERS, ROOM_TIMEOUT_MS } from "../shared/constants";
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_TIMEOUT_MS,
+  RECONNECT_GRACE_MS,
+  TURN_TIMER_MS,
+  RESPONSE_TIMER_MS,
+  DISCONNECTED_RESPONSE_TIMER_MS,
+  TIMER_UPDATE_INTERVAL_MS,
+} from "../shared/constants";
 import { initializeGame, applyAction } from "../engine/GameEngine";
 import { serverMsg } from "../shared/protocol";
 
@@ -41,7 +52,27 @@ export class GameRoom {
   createdAt: number;
   lastActivityAt: number;
 
-  constructor(code: string, hostId: string, hostName: string, hostAvatar: number, ws: WebSocket, sessionToken: string) {
+  // Timer state
+  private turnTimer: ReturnType<typeof setTimeout> | null = null;
+  private responseTimer: ReturnType<typeof setTimeout> | null = null;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private timerDeadline: number = 0;
+  private timerType: "turn" | "response" = "turn";
+  private timerTargetPlayerId: string = "";
+
+  // Disconnect handling
+  private skippedPlayerIds: Set<string> = new Set();
+  private disconnectTimers: Map<string, ReturnType<typeof setTimeout>> =
+    new Map();
+
+  constructor(
+    code: string,
+    hostId: string,
+    hostName: string,
+    hostAvatar: number,
+    ws: WebSocket,
+    sessionToken: string
+  ) {
     this.code = code;
     this.status = RoomStatus.Waiting;
     this.hostId = hostId;
@@ -118,6 +149,16 @@ export class GameRoom {
       if (gamePlayer) gamePlayer.connected = true;
     }
 
+    // Clear disconnect timer if one exists
+    const disconnectTimer = this.disconnectTimers.get(playerId);
+    if (disconnectTimer) {
+      clearTimeout(disconnectTimer);
+      this.disconnectTimers.delete(playerId);
+    }
+
+    // Remove from skipped set — they're back
+    this.skippedPlayerIds.delete(playerId);
+
     // Send current state to reconnected player
     if (this.gameState) {
       this.sendStateToPlayer(playerId);
@@ -129,6 +170,18 @@ export class GameRoom {
         playerName: player.name,
       })
     );
+
+    // If it's now their turn and timers aren't running, start turn timer
+    if (this.gameState) {
+      const currentPlayer =
+        this.gameState.players[this.gameState.currentPlayerIndex];
+      if (
+        currentPlayer.id === playerId &&
+        this.gameState.phase === TurnPhase.Play
+      ) {
+        this.startTurnTimer(playerId);
+      }
+    }
 
     return true;
   }
@@ -154,6 +207,33 @@ export class GameRoom {
         temporary: this.status === RoomStatus.Playing,
       })
     );
+
+    // Handle disconnect during active game
+    if (this.gameState && this.status === RoomStatus.Playing) {
+      const currentPlayer =
+        this.gameState.players[this.gameState.currentPlayerIndex];
+
+      if (currentPlayer.id === playerId) {
+        // It's the disconnected player's turn — give them grace period
+        this.clearTimers();
+        const timer = setTimeout(() => {
+          this.disconnectTimers.delete(playerId);
+          this.skippedPlayerIds.add(playerId);
+          this.autoEndTurn(playerId);
+        }, RECONNECT_GRACE_MS);
+        this.disconnectTimers.set(playerId, timer);
+      }
+
+      // If they're targeted by a pending action, auto-accept after 10s
+      if (
+        this.gameState.pendingAction &&
+        this.gameState.pendingAction.targetPlayerIds.includes(playerId) &&
+        !this.gameState.pendingAction.respondedPlayerIds.includes(playerId)
+      ) {
+        this.clearTimers();
+        this.startResponseTimer(playerId, DISCONNECTED_RESPONSE_TIMER_MS);
+      }
+    }
   }
 
   // ---- Game Start ----
@@ -183,6 +263,10 @@ export class GameRoom {
     // Send initial state to all players
     this.broadcastGameState("Game started!");
 
+    // Start turn timer for the first player
+    const firstPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
+    this.startTurnTimer(firstPlayer.id);
+
     return { success: true };
   }
 
@@ -199,6 +283,10 @@ export class GameRoom {
     }
 
     this.lastActivityAt = Date.now();
+
+    // Track the current player and phase before action to detect turn changes
+    const prevPlayerIndex = this.gameState.currentPlayerIndex;
+    const prevPhase = this.gameState.phase;
 
     const result = applyAction(this.gameState, action);
 
@@ -219,6 +307,9 @@ export class GameRoom {
     // Update the authoritative state
     this.gameState = result.state;
 
+    // Clear existing timers — we'll set new ones based on new state
+    this.clearTimers();
+
     // Broadcast to all
     this.broadcastGameState(result.description);
 
@@ -234,9 +325,205 @@ export class GameRoom {
           winnerName: winner?.name || "Unknown",
         })
       );
+      return { success: true };
     }
 
+    // Set up timers based on new game phase
+    this.setupTimersForCurrentState();
+
     return { success: true };
+  }
+
+  // ---- Timer Management ----
+
+  private setupTimersForCurrentState(): void {
+    if (!this.gameState) return;
+
+    const currentPlayer =
+      this.gameState.players[this.gameState.currentPlayerIndex];
+
+    if (this.gameState.phase === TurnPhase.AwaitingResponse) {
+      // Find the first unresponded target player
+      const pending = this.gameState.pendingAction;
+      if (pending) {
+        const unrespondedId = pending.targetPlayerIds.find(
+          (id) => !pending.respondedPlayerIds.includes(id)
+        );
+        if (unrespondedId) {
+          const targetConnPlayer = this.players.find(
+            (p) => p.id === unrespondedId
+          );
+          const isDisconnected = !targetConnPlayer?.ws;
+          const duration = isDisconnected
+            ? DISCONNECTED_RESPONSE_TIMER_MS
+            : RESPONSE_TIMER_MS;
+          this.startResponseTimer(unrespondedId, duration);
+        }
+      }
+    } else if (
+      this.gameState.phase === TurnPhase.Play ||
+      this.gameState.phase === TurnPhase.Discard
+    ) {
+      // Check if the current player is skipped (disconnected too long)
+      if (this.skippedPlayerIds.has(currentPlayer.id)) {
+        // Auto-end their turn immediately
+        setTimeout(() => this.autoEndTurn(currentPlayer.id), 0);
+      } else if (!currentPlayer.connected) {
+        // Player is disconnected but not yet skipped — start grace period
+        const timer = setTimeout(() => {
+          this.disconnectTimers.delete(currentPlayer.id);
+          this.skippedPlayerIds.add(currentPlayer.id);
+          this.autoEndTurn(currentPlayer.id);
+        }, RECONNECT_GRACE_MS);
+        this.disconnectTimers.set(currentPlayer.id, timer);
+      } else {
+        this.startTurnTimer(currentPlayer.id);
+      }
+    }
+  }
+
+  private startTurnTimer(playerId: string): void {
+    this.clearTimers();
+    this.timerType = "turn";
+    this.timerTargetPlayerId = playerId;
+    this.timerDeadline = Date.now() + TURN_TIMER_MS;
+
+    this.turnTimer = setTimeout(() => {
+      this.turnTimer = null;
+      this.clearTimerInterval();
+      this.autoEndTurn(playerId);
+    }, TURN_TIMER_MS);
+
+    // Send timer updates every 5 seconds
+    this.sendTimerUpdate();
+    this.timerInterval = setInterval(() => {
+      this.sendTimerUpdate();
+    }, TIMER_UPDATE_INTERVAL_MS);
+  }
+
+  private startResponseTimer(playerId: string, duration: number): void {
+    this.clearTimers();
+    this.timerType = "response";
+    this.timerTargetPlayerId = playerId;
+    this.timerDeadline = Date.now() + duration;
+
+    this.responseTimer = setTimeout(() => {
+      this.responseTimer = null;
+      this.clearTimerInterval();
+      this.autoAccept(playerId);
+    }, duration);
+
+    // Send timer updates every 5 seconds
+    this.sendTimerUpdate();
+    this.timerInterval = setInterval(() => {
+      this.sendTimerUpdate();
+    }, TIMER_UPDATE_INTERVAL_MS);
+  }
+
+  private sendTimerUpdate(): void {
+    const secondsRemaining = Math.max(
+      0,
+      Math.ceil((this.timerDeadline - Date.now()) / 1000)
+    );
+    this.broadcast(
+      serverMsg(ServerMessageType.TimerUpdate, {
+        playerId: this.timerTargetPlayerId,
+        secondsRemaining,
+        timerType: this.timerType,
+      })
+    );
+  }
+
+  clearTimers(): void {
+    if (this.turnTimer) {
+      clearTimeout(this.turnTimer);
+      this.turnTimer = null;
+    }
+    if (this.responseTimer) {
+      clearTimeout(this.responseTimer);
+      this.responseTimer = null;
+    }
+    this.clearTimerInterval();
+  }
+
+  private clearTimerInterval(): void {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  private autoEndTurn(playerId: string): void {
+    if (!this.gameState) return;
+    const currentPlayer =
+      this.gameState.players[this.gameState.currentPlayerIndex];
+    if (currentPlayer.id !== playerId) return;
+
+    if (this.gameState.phase === TurnPhase.Discard) {
+      // Auto-discard: discard from the end of hand until at 7
+      const hand = currentPlayer.hand;
+      const excess = hand.length - 7;
+      if (excess > 0) {
+        const discardIds = hand.slice(-excess).map((c) => c.id);
+        this.processAction({
+          type: ActionType.DiscardCards,
+          playerId,
+          cardIds: discardIds,
+        });
+        return;
+      }
+    }
+
+    this.processAction({
+      type: ActionType.EndTurn,
+      playerId,
+    });
+  }
+
+  private autoAccept(playerId: string): void {
+    if (!this.gameState || !this.gameState.pendingAction) return;
+
+    const pending = this.gameState.pendingAction;
+    const isPayment = [
+      PendingActionType.PayRent,
+      PendingActionType.PayDebtCollector,
+      PendingActionType.PayBirthday,
+    ].includes(pending.type);
+
+    if (isPayment) {
+      // Auto-pay: gather all bank + property card IDs
+      const cardIds = this.getAutoPayCardIds(playerId);
+      this.processAction({
+        type: ActionType.PayWithCards,
+        playerId,
+        cardIds,
+      });
+    } else {
+      // Steal/deal actions: auto-accept
+      this.processAction({
+        type: ActionType.AcceptAction,
+        playerId,
+      });
+    }
+  }
+
+  private getAutoPayCardIds(playerId: string): string[] {
+    if (!this.gameState) return [];
+    const player = this.gameState.players.find((p) => p.id === playerId);
+    if (!player) return [];
+
+    const ids: string[] = [];
+    // Bank cards first
+    for (const card of player.bank) {
+      ids.push(card.id);
+    }
+    // Then property cards
+    for (const group of player.properties) {
+      for (const card of group.cards) {
+        ids.push(card.id);
+      }
+    }
+    return ids;
   }
 
   // ---- State Broadcasting ----
@@ -348,5 +635,14 @@ export class GameRoom {
 
   getPlayerBySessionToken(token: string): ConnectedPlayer | undefined {
     return this.players.find((p) => p.sessionToken === token);
+  }
+
+  /** Clean up all timers when the room is destroyed */
+  destroy(): void {
+    this.clearTimers();
+    for (const timer of this.disconnectTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.disconnectTimers.clear();
   }
 }

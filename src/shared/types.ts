@@ -205,6 +205,7 @@ export enum ServerMessageType {
   ActionRejected = "action_rejected",
   ActionResolved = "action_resolved",
   GameOver = "game_over",
+  TimerUpdate = "timer_update",
   Error = "error",
   Ping = "ping",
 }

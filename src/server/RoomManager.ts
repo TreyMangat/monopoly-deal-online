@@ -9,9 +9,17 @@ import { v4 as uuidv4 } from "uuid";
 import { GameRoom } from "./GameRoom";
 import { ROOM_CODE_LENGTH } from "../shared/constants";
 
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_MESSAGES = 10;
+
+interface RateLimitEntry {
+  timestamps: number[];
+}
+
 export class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
   private cleanupInterval: ReturnType<typeof setInterval>;
+  private rateLimits: WeakMap<WebSocket, RateLimitEntry> = new WeakMap();
 
   constructor() {
     // Cleanup expired/empty rooms every 5 minutes
@@ -167,8 +175,36 @@ export class RoomManager {
     };
   }
 
+  /**
+   * Returns true if the message should be allowed, false if rate-limited.
+   * Max 10 messages per second per WebSocket connection.
+   */
+  checkRateLimit(ws: WebSocket): boolean {
+    const now = Date.now();
+    let entry = this.rateLimits.get(ws);
+    if (!entry) {
+      entry = { timestamps: [] };
+      this.rateLimits.set(ws, entry);
+    }
+
+    // Remove timestamps outside the current window
+    entry.timestamps = entry.timestamps.filter(
+      (t) => now - t < RATE_LIMIT_WINDOW_MS
+    );
+
+    if (entry.timestamps.length >= RATE_LIMIT_MAX_MESSAGES) {
+      return false; // rate limited
+    }
+
+    entry.timestamps.push(now);
+    return true;
+  }
+
   destroy(): void {
     clearInterval(this.cleanupInterval);
+    for (const room of this.rooms.values()) {
+      room.destroy();
+    }
     this.rooms.clear();
   }
 }

@@ -59,6 +59,12 @@ export const ROOM_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
 export const RECONNECT_GRACE_MS = 120 * 1000; // 2 minutes to reconnect
 export const PING_INTERVAL_MS = 15 * 1000;
 
+// Turn timers
+export const TURN_TIMER_MS = 60 * 1000; // 60 seconds to take your turn
+export const RESPONSE_TIMER_MS = 30 * 1000; // 30 seconds to respond to an action
+export const DISCONNECTED_RESPONSE_TIMER_MS = 10 * 1000; // 10 seconds if targeted player is disconnected
+export const TIMER_UPDATE_INTERVAL_MS = 5 * 1000; // send countdown every 5 seconds
+
 // Action card values (what they charge)
 export const DEBT_COLLECTOR_AMOUNT = 5;
 export const BIRTHDAY_AMOUNT = 2;

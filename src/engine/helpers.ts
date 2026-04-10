@@ -130,7 +130,32 @@ export function removeCardFromProperties(
   for (const group of player.properties) {
     const index = group.cards.findIndex((c) => c.id === cardId);
     if (index !== -1) {
+      const wasComplete = isSetComplete(group);
       const card = group.cards.splice(index, 1)[0];
+
+      // If removing this card broke a complete set, strip house/hotel
+      // and convert them to money cards in the player's bank
+      if (wasComplete && !isSetComplete(group)) {
+        if (group.hasHotel) {
+          group.hasHotel = false;
+          player.bank.push({
+            id: `hotel_money_${Date.now()}_${Math.random()}`,
+            type: CardType.Money,
+            name: "$4M (Hotel)",
+            bankValue: 4,
+          });
+        }
+        if (group.hasHouse) {
+          group.hasHouse = false;
+          player.bank.push({
+            id: `house_money_${Date.now()}_${Math.random()}`,
+            type: CardType.Money,
+            name: "$3M (House)",
+            bankValue: 3,
+          });
+        }
+      }
+
       // Clean up empty groups
       if (group.cards.length === 0) {
         group.hasHouse = false;
