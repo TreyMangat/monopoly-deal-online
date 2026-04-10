@@ -177,7 +177,8 @@ export class GameRoom {
         this.gameState.players[this.gameState.currentPlayerIndex];
       if (
         currentPlayer.id === playerId &&
-        this.gameState.phase === TurnPhase.Play
+        (this.gameState.phase === TurnPhase.Play ||
+          this.gameState.phase === TurnPhase.Draw)
       ) {
         this.startTurnTimer(playerId);
       }
@@ -362,7 +363,8 @@ export class GameRoom {
       }
     } else if (
       this.gameState.phase === TurnPhase.Play ||
-      this.gameState.phase === TurnPhase.Discard
+      this.gameState.phase === TurnPhase.Discard ||
+      this.gameState.phase === TurnPhase.Draw
     ) {
       // Check if the current player is skipped (disconnected too long)
       if (this.skippedPlayerIds.has(currentPlayer.id)) {
@@ -458,6 +460,21 @@ export class GameRoom {
     const currentPlayer =
       this.gameState.players[this.gameState.currentPlayerIndex];
     if (currentPlayer.id !== playerId) return;
+
+    if (this.gameState.phase === TurnPhase.Draw) {
+      // Auto-draw first, then end turn
+      this.processAction({
+        type: ActionType.DrawCards,
+        playerId,
+      });
+      if (this.gameState && (this.gameState.phase as TurnPhase) === TurnPhase.Play) {
+        this.processAction({
+          type: ActionType.EndTurn,
+          playerId,
+        });
+      }
+      return;
+    }
 
     if (this.gameState.phase === TurnPhase.Discard) {
       // Auto-discard: discard from the end of hand until at 7

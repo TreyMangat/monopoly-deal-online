@@ -70,21 +70,37 @@ describe("Game Initialization", () => {
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
 
-    // After init, draw phase auto-draws 2 more for p1
-    // So p1 has 7, p2 has 5
-    expect(state.players[0].hand.length).toBe(7);
+    // After init, players have 5 cards each (no auto-draw)
+    expect(state.players[0].hand.length).toBe(5);
     expect(state.players[1].hand.length).toBe(5);
   });
 
-  it("should start in Play phase (after auto-draw)", () => {
+  it("should start in Draw phase", () => {
     const state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
 
-    expect(state.phase).toBe(TurnPhase.Play);
+    expect(state.phase).toBe(TurnPhase.Draw);
     expect(state.currentPlayerIndex).toBe(0);
     expect(state.actionsRemaining).toBe(3);
+  });
+
+  it("should enter Play phase after DrawCards action", () => {
+    const state = initializeGame("TEST", [
+      { id: "p1", name: "Alice", avatar: 0 },
+      { id: "p2", name: "Bob", avatar: 1 },
+    ]);
+
+    const result = applyAction(state, {
+      type: ActionType.DrawCards,
+      playerId: "p1",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.state.phase).toBe(TurnPhase.Play);
+      expect(result.state.players[0].hand.length).toBe(7); // 5 + 2 drawn
+    }
   });
 
   it("should use double deck for 6 players", () => {
@@ -96,7 +112,7 @@ describe("Game Initialization", () => {
 
     const state = initializeGame("TEST", players);
     expect(state.useDoubleDeck).toBe(true);
-    // 212 - (6 * 5) - 2 (first player auto draw) = 180
+    // 212 - (6 * 5) = 182 (no auto-draw yet)
     const totalCardsInPlay =
       state.deck.length +
       state.players.reduce((sum, p) => sum + p.hand.length, 0);
@@ -115,6 +131,9 @@ describe("Turn Actions", () => {
       { id: "p2", name: "Bob", avatar: 1 },
       { id: "p3", name: "Charlie", avatar: 2 },
     ]);
+    // Draw cards to enter Play phase
+    const drawResult = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult.ok) state = drawResult.state;
   });
 
   it("should allow banking a money card", () => {
@@ -193,7 +212,7 @@ describe("Turn Actions", () => {
     }
   });
 
-  it("should end turn and advance to next player", () => {
+  it("should end turn and advance to next player in Draw phase", () => {
     const result = applyAction(state, {
       type: ActionType.EndTurn,
       playerId: "p1",
@@ -202,9 +221,9 @@ describe("Turn Actions", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.state.currentPlayerIndex).toBe(1);
-      expect(result.state.phase).toBe(TurnPhase.Play);
-      // p2 should have drawn 2 cards (5 initial + 2 = 7)
-      expect(result.state.players[1].hand.length).toBe(7);
+      expect(result.state.phase).toBe(TurnPhase.Draw);
+      // p2 has not drawn yet — still at 5 initial cards
+      expect(result.state.players[1].hand.length).toBe(5);
     }
   });
 });
@@ -213,10 +232,13 @@ describe("Turn Actions", () => {
 
 describe("Double Rent", () => {
   function setupDoubleRentScenario() {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
+    // Draw cards to enter Play phase
+    const drawResult = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult.ok) state = drawResult.state;
 
     const player = state.players[0];
 
@@ -516,10 +538,12 @@ describe("Reshuffle and Empty Deck", () => {
   });
 
   it("should not break Pass Go when deck has fewer than 2 cards", () => {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
+    const drawResult = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult.ok) state = drawResult.state;
 
     const player = state.players[0];
 
@@ -552,10 +576,12 @@ describe("Reshuffle and Empty Deck", () => {
   });
 
   it("should not error when Pass Go is played with 0 cards in deck", () => {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
+    const drawResult = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult.ok) state = drawResult.state;
 
     const player = state.players[0];
     const passGoCard: Card = {
@@ -595,10 +621,12 @@ describe("Reshuffle and Empty Deck", () => {
 
 describe("Wild Card Color on Payment", () => {
   it("should place 2-color wild to primary color in receiver's properties", () => {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
+    const drawResult = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult.ok) state = drawResult.state;
 
     const p1 = state.players[0];
     const p2 = state.players[1];
@@ -658,10 +686,12 @@ describe("Wild Card Color on Payment", () => {
   });
 
   it("should place rainbow wild in receiver's bank (not properties)", () => {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
+    const drawResult2 = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (drawResult2.ok) state = drawResult2.state;
 
     const p1 = state.players[0];
     const p2 = state.players[1];
@@ -834,12 +864,16 @@ describe("House/Hotel Teardown on Payment", () => {
 
 describe("Empty Hand Draw", () => {
   it("should draw 5 cards when player has 0 cards at start of turn", () => {
-    const state = initializeGame("TEST", [
+    let state = initializeGame("TEST", [
       { id: "p1", name: "Alice", avatar: 0 },
       { id: "p2", name: "Bob", avatar: 1 },
     ]);
 
-    // End p1's turn
+    // Draw cards for p1 to enter Play phase
+    const dr = applyAction(state, { type: ActionType.DrawCards, playerId: "p1" });
+    if (dr.ok) state = dr.state;
+
+    // End p1's turn — p2 enters Draw phase
     const r1 = applyAction(state, {
       type: ActionType.EndTurn,
       playerId: "p1",
@@ -847,36 +881,19 @@ describe("Empty Hand Draw", () => {
     expect(r1.ok).toBe(true);
     if (!r1.ok) return;
 
-    // Now it's p2's turn (auto-drew 2 cards, so p2 has 7)
-    // End p2's turn
+    // Empty p2's hand before they draw
+    r1.state.players[1].hand = [];
+
+    // p2 draws — should get 5 cards (empty hand rule)
     const r2 = applyAction(r1.state, {
-      type: ActionType.EndTurn,
+      type: ActionType.DrawCards,
       playerId: "p2",
     });
     expect(r2.ok).toBe(true);
     if (!r2.ok) return;
 
-    // It's p1's turn again. Force p1's hand to empty BEFORE the draw happens.
-    // Since performDraw already happened, we need to set up differently.
-    // Instead, let's manipulate state directly before advancing turn.
-    const state2 = initializeGame("TEST", [
-      { id: "p1", name: "Alice", avatar: 0 },
-      { id: "p2", name: "Bob", avatar: 1 },
-    ]);
-
-    // Empty p2's hand to simulate 0 cards at turn start
-    state2.players[1].hand = [];
-
-    // End p1's turn — this advances to p2 and auto-draws
-    const r3 = applyAction(state2, {
-      type: ActionType.EndTurn,
-      playerId: "p1",
-    });
-    expect(r3.ok).toBe(true);
-    if (!r3.ok) return;
-
-    // p2 had 0 cards, should have drawn 5
-    expect(r3.state.players[1].hand.length).toBe(5);
+    expect(r2.state.players[1].hand.length).toBe(5);
+    expect(r2.state.phase).toBe(TurnPhase.Play);
   });
 });
 

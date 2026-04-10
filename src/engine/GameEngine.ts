@@ -99,21 +99,24 @@ export function initializeGame(
     doubleRentActive: false,
   };
 
-  // Auto-draw for the first player
-  return performDraw(state);
+  // Player must draw cards to start their turn
+  return state;
 }
 
 // ---- Draw Phase ----
 
-function performDraw(state: GameState): GameState {
-  const player = getCurrentPlayer(state);
+function handleDrawCards(
+  state: GameState,
+  player: PlayerState
+): EngineResult {
   const count =
     player.hand.length === 0 ? CARDS_TO_DRAW_EMPTY_HAND : CARDS_TO_DRAW;
   const drawn = drawCards(state, count);
   player.hand.push(...drawn);
   state.phase = TurnPhase.Play;
   state.actionsRemaining = MAX_PLAYS_PER_TURN;
-  return state;
+  const desc = `${player.name} drew ${drawn.length} card${drawn.length !== 1 ? "s" : ""}`;
+  return { ok: true, state, description: desc };
 }
 
 // ---- Main Action Processor ----
@@ -141,6 +144,13 @@ export function applyAction(
 
   if (state.phase === TurnPhase.Discard) {
     return handleDiscard(state, action, player);
+  }
+
+  if (state.phase === TurnPhase.Draw) {
+    if (action.type === ActionType.DrawCards) {
+      return handleDrawCards(state, player);
+    }
+    return { ok: false, error: "Must draw cards first" };
   }
 
   if (state.phase !== TurnPhase.Play) {
@@ -214,9 +224,6 @@ function advanceTurn(state: GameState): void {
     (state.currentPlayerIndex + 1) % state.players.length;
   state.turnNumber++;
   state.phase = TurnPhase.Draw;
-
-  // Auto-draw for next player
-  performDraw(state);
 }
 
 // ---- Play Actions ----

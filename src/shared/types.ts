@@ -165,6 +165,7 @@ export enum ActionType {
   AcceptAction = "accept_action", // accept a steal/deal/breaker
 
   // Turn management
+  DrawCards = "draw_cards",
   EndTurn = "end_turn",
   DiscardCards = "discard_cards",
 

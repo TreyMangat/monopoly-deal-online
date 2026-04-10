@@ -73,6 +73,9 @@ function setupGameRoom(): {
 
   room.startGame(p1Id);
 
+  // Draw cards for p1 to enter Play phase
+  room.processAction({ type: ActionType.DrawCards, playerId: p1Id });
+
   return { room, ws1, ws2, p1Id, p2Id };
 }
 
@@ -285,7 +288,11 @@ describe("Disconnect Handling", () => {
       room.gameState!.players[room.gameState!.currentPlayerIndex].id
     ).toBe(p2Id);
 
-    // Player 2 ends turn
+    // Player 2 draws then ends turn
+    room.processAction({
+      type: ActionType.DrawCards,
+      playerId: p2Id,
+    });
     room.processAction({
       type: ActionType.EndTurn,
       playerId: p2Id,
@@ -311,6 +318,12 @@ describe("Disconnect Handling", () => {
 
     // Now disconnect player 1
     room.handleDisconnect(p1Id);
+
+    // Player 2 draws cards to enter Play phase
+    room.processAction({
+      type: ActionType.DrawCards,
+      playerId: p2Id,
+    });
 
     const gs = room.gameState!;
     const player2 = gs.players.find((p) => p.id === p2Id)!;

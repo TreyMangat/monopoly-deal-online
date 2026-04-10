@@ -150,14 +150,18 @@ describe("Full Game Integration", () => {
 
     s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
     expect(s.currentPlayerIndex).toBe(1);
-    expect(s.players[1].hand).toHaveLength(7); // 5 + 2 auto-drawn
+    expect(s.phase).toBe(TurnPhase.Draw);
+    expect(s.players[1].hand).toHaveLength(5); // not yet drawn
     expect(s.turnNumber).toBe(2);
 
-    // ---- Turn 2: P2 plays Pass Go, charges rent, collects payment ----
+    // ---- Turn 2: P2 draws, plays Pass Go, charges rent, collects payment ----
+    s = ok(applyAction(s, { type: ActionType.DrawCards, playerId: "p2" }));
+    expect(s.players[1].hand).toHaveLength(7); // 5 + 2 drawn
+
     s = ok(applyAction(s, {
       type: ActionType.PlayPassGo, playerId: "p2", cardId: "passgo1",
     }));
-    expect(s.players[1].hand).toHaveLength(8); // 7 - 1 + 2 drawn
+    expect(s.players[1].hand).toHaveLength(8); // 7 - 1 + 2 drawn from Pass Go
 
     s = ok(applyAction(s, {
       type: ActionType.PlayRentCard, playerId: "p2",
@@ -185,7 +189,9 @@ describe("Full Game Integration", () => {
     expect(s.currentPlayerIndex).toBe(2);
     expect(s.turnNumber).toBe(3);
 
-    // ---- Turn 3: P3 Sly Deal → P1 Just Say No → P3 accepts ----
+    // ---- Turn 3: P3 draws, Sly Deal → P1 Just Say No → P3 accepts ----
+    s = ok(applyAction(s, { type: ActionType.DrawCards, playerId: "p3" }));
+
     s = ok(applyAction(s, {
       type: ActionType.PlaySlyDeal, playerId: "p3", cardId: "slydeal1",
       targetPlayerId: "p1", targetCardId: "stcharles",
@@ -208,7 +214,8 @@ describe("Full Game Integration", () => {
     expect(s.currentPlayerIndex).toBe(0);
     expect(s.turnNumber).toBe(4);
 
-    // ---- Turn 4: P1 completes LightBlue → 3 complete sets → WIN ----
+    // ---- Turn 4: P1 draws, completes LightBlue → 3 complete sets → WIN ----
+    s = ok(applyAction(s, { type: ActionType.DrawCards, playerId: "p1" }));
     // P1 has Brown(2/2), Utility(2/2) complete. LightBlue cards in hand.
     s = ok(applyAction(s, {
       type: ActionType.PlayPropertyCard, playerId: "p1",
@@ -388,8 +395,8 @@ describe("Full Game Integration", () => {
       type: ActionType.DiscardCards, playerId: "p1", cardIds: ["extra2"],
     }));
 
-    // Advances to P2's turn
-    expect(s.phase).toBe(TurnPhase.Play);
+    // Advances to P2's Draw phase
+    expect(s.phase).toBe(TurnPhase.Draw);
     expect(s.currentPlayerIndex).toBe(1);
     expect(s.players[0].hand).toHaveLength(7);
   });
