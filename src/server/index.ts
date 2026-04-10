@@ -87,8 +87,11 @@ const httpServer = http.createServer((req, res) => {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || "application/octet-stream";
 
-      // Service worker must not be cached (browsers need fresh SW checks)
-      const cacheControl = filePath.endsWith("service-worker.js")
+      // Service worker and icons must not be cached
+      const isNoCacheFile =
+        filePath.endsWith("service-worker.js") ||
+        filePath.includes(`${path.sep}icons${path.sep}`);
+      const cacheControl = isNoCacheFile
         ? "no-cache"
         : "public, max-age=86400";
 

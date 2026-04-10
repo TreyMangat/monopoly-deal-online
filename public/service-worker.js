@@ -1,8 +1,8 @@
 // ============================================================
-// Property Deal — Service Worker (PWA offline support)
+// Monopoly Deal Online — Service Worker (PWA offline support)
 // ============================================================
 
-const CACHE_NAME = 'property-deal-v1';
+const CACHE_NAME = 'monopoly-deal-v2';
 
 const APP_SHELL = [
   '/',
@@ -16,7 +16,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Property Deal — Offline</title>
+<title>Monopoly Deal — Offline</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#141624;color:#eee;font-family:'Segoe UI',system-ui,sans-serif;
@@ -33,7 +33,7 @@ button:active{opacity:.7}
 <body>
 <div class="icon">📡</div>
 <h1>You're offline</h1>
-<p>Property Deal needs an internet connection to play. Reconnect and try again.</p>
+<p>Monopoly Deal needs an internet connection to play. Reconnect and try again.</p>
 <button onclick="location.reload()">Retry</button>
 </body>
 </html>`;
