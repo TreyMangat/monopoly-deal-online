@@ -399,6 +399,38 @@ function handleClientMessage(
       break;
     }
 
+    case ClientMessageType.Reconnect: {
+      const {
+        roomCode: reconnRoomCode,
+        playerId: reconnPlayerId,
+        sessionToken: reconnSessionToken,
+      } = payload;
+      if (!reconnRoomCode || !reconnPlayerId || !reconnSessionToken) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "MISSING_FIELDS",
+            message: "Room code, player ID, and session token are required",
+          })
+        );
+        return;
+      }
+      const reconnResult = roomManager.reconnect(
+        reconnRoomCode,
+        reconnPlayerId,
+        reconnSessionToken,
+        ws
+      );
+      if (!reconnResult.success) {
+        ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "RECONNECT_FAILED",
+            message: reconnResult.error,
+          })
+        );
+      }
+      break;
+    }
+
     case ClientMessageType.Pong: {
       // Client responding to our ping — handled by ws 'pong' event
       break;

@@ -253,6 +253,7 @@ export enum ClientMessageType {
   CastVote = "cast_vote",
   EndGame = "end_game",
   LeaveGame = "leave_game",
+  Reconnect = "reconnect",
   Pong = "pong",
 }
 

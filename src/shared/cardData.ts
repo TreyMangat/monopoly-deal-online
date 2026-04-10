@@ -170,6 +170,19 @@ const TWO_COLOR_WILDS: WildDef[] = [
   },
 ];
 
+const COLOR_DISPLAY_NAMES: Record<PropertyColor, string> = {
+  [PropertyColor.Brown]: "Brown",
+  [PropertyColor.LightBlue]: "Light Blue",
+  [PropertyColor.Pink]: "Pink",
+  [PropertyColor.Orange]: "Orange",
+  [PropertyColor.Red]: "Red",
+  [PropertyColor.Yellow]: "Yellow",
+  [PropertyColor.Green]: "Green",
+  [PropertyColor.DarkBlue]: "Dark Blue",
+  [PropertyColor.Railroad]: "Railroad",
+  [PropertyColor.Utility]: "Utility",
+};
+
 function buildPropertyWildCards(): Card[] {
   const cards: Card[] = [];
 
@@ -178,7 +191,7 @@ function buildPropertyWildCards(): Card[] {
       cards.push({
         id: makeId(`wild_${def.color}_${def.altColor}`),
         type: CardType.PropertyWild,
-        name: `Wild ${def.color}/${def.altColor}`,
+        name: `Wild ${COLOR_DISPLAY_NAMES[def.color]}/${COLOR_DISPLAY_NAMES[def.altColor]}`,
         bankValue: def.bankValue,
         color: def.color,
         altColor: def.altColor,

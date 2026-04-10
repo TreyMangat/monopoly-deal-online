@@ -185,9 +185,10 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   background:radial-gradient(ellipse at 50% 40%,#1a3a2e 0%,#0f2a1e 40%,var(--navy) 100%)}
 #game.active{display:flex;opacity:1}
 
-/* Icon tile pattern overlay */
+/* Subtle dot pattern overlay */
 #game::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;
-  background:url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='28' font-size='16' fill='rgba(255,255,255,0.015)' font-family='sans-serif'%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E");
+  background:radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size:16px 16px;
   z-index:0}
 
 /* Radial spotlight */
@@ -510,6 +511,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .ap-item:last-child{border-bottom:none}
 .ap-item:active{background:rgba(255,255,255,.06)}
 .ap-item.destructive{color:var(--accent)}
+.ap-item.highlight{color:var(--gold-bright);background:rgba(255,215,0,.08)}
 .ap-divider{height:1px;background:rgba(255,255,255,.06)}
 .ap-cancel{background:rgba(15,30,54,.92);border-radius:18px;padding:14px 16px;font-size:16px;font-weight:700;
   text-align:center;cursor:pointer;color:var(--teal);-webkit-user-select:none;user-select:none;touch-action:manipulation;
@@ -1061,6 +1063,9 @@ let selectedCardId = null;
 let actionLogs = [];
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let heartbeatInterval = null;
+let lastMessageTime = 0;
+let heartbeatPongTimer = null;
 let myVote = null;
 let voteCountdown = null;
 
@@ -1440,29 +1445,111 @@ function showScreen(id) {
 // ============================================================
 // WEBSOCKET
 // ============================================================
-function connect() {
+function connect(isReconnect) {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   const url = getWsUrl();
   ws = new WebSocket(url);
   ws.onopen = () => {
     reconnectAttempts = 0;
-    document.getElementById('connStatus').classList.remove('active');
+    lastMessageTime = Date.now();
+    const connEl = document.getElementById('connStatus');
+    connEl.classList.remove('active');
+    connEl.textContent = 'Reconnecting...';
+    connEl.onclick = null;
+    startHeartbeat();
+    // If reconnecting with existing session, send reconnect message
+    if (isReconnect && myPlayerId && mySessionToken && roomCode) {
+      send('reconnect', { roomCode, playerId: myPlayerId, sessionToken: mySessionToken });
+    }
   };
-  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-  ws.onclose = () => { scheduleReconnect(); };
+  ws.onmessage = (e) => {
+    lastMessageTime = Date.now();
+    if (heartbeatPongTimer) { clearTimeout(heartbeatPongTimer); heartbeatPongTimer = null; }
+    handleMessage(JSON.parse(e.data));
+  };
+  ws.onclose = () => { stopHeartbeat(); scheduleReconnect(); };
   ws.onerror = () => {};
 }
 
 function scheduleReconnect() {
   if (reconnectTimer) return;
-  document.getElementById('connStatus').classList.add('active');
-  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+  // Use shorter delays: 2s, 4s, 8s then show manual retry
+  if (reconnectAttempts >= 3) {
+    showManualRetry();
+    return;
+  }
+  const connEl = document.getElementById('connStatus');
+  connEl.textContent = 'Reconnecting...';
+  connEl.onclick = null;
+  connEl.classList.add('active');
+  const delay = 2000 * Math.pow(2, reconnectAttempts);
   reconnectAttempts++;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    connect();
+    connect(true);
   }, delay);
 }
+
+function showManualRetry() {
+  const connEl = document.getElementById('connStatus');
+  connEl.textContent = 'Connection lost. Tap to retry';
+  connEl.style.cursor = 'pointer';
+  connEl.onclick = () => {
+    reconnectAttempts = 0;
+    connEl.textContent = 'Reconnecting...';
+    connEl.onclick = null;
+    connEl.style.cursor = '';
+    connect(true);
+  };
+  connEl.classList.add('active');
+}
+
+function forceReconnect() {
+  if (ws) {
+    try { ws.onclose = null; ws.close(); } catch(e) {}
+    ws = null;
+  }
+  reconnectAttempts = 0;
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  connect(true);
+}
+
+// ---- Heartbeat: detect stale connections ----
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatInterval = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (Date.now() - lastMessageTime > 20000) {
+      // No message in 20s — send a ping and wait for response
+      try { ws.send(JSON.stringify({ type: 'pong', payload: {} })); } catch(e) {}
+      heartbeatPongTimer = setTimeout(() => {
+        // No response in 5s — force reconnect
+        forceReconnect();
+      }, 5000);
+    }
+  }, 10000);
+}
+
+function stopHeartbeat() {
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+  if (heartbeatPongTimer) { clearTimeout(heartbeatPongTimer); heartbeatPongTimer = null; }
+}
+
+// ---- Visibility change: reconnect when returning to app ----
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    // Returned to foreground — check connection
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      forceReconnect();
+    } else {
+      // Connection looks open but may be stale — send a ping to verify
+      lastMessageTime = Date.now();
+      try { ws.send(JSON.stringify({ type: 'pong', payload: {} })); } catch(e) {
+        forceReconnect();
+      }
+    }
+  }
+});
 
 function send(type, payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) { toast('Not connected'); return; }
@@ -1824,13 +1911,14 @@ function renderOpponents() {
       propsHtml += '</div>';
     }
 
-    const bankTotal = opp.bank ? opp.bank.reduce((s, c) => s + c.bankValue, 0) : 0;
     const bankCount = opp.bank ? opp.bank.length : 0;
+    const bankTopValue = (opp.bank && opp.bank.length > 0) ? opp.bank[opp.bank.length - 1].bankValue : 0;
+    const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
     div.innerHTML = `
       <div class="opp-name">${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
       <div class="opp-stats">
         <span class="opp-hand">&#127183; ${opp.handCount} cards</span>
-        <span class="opp-bank">&#128176; $${bankTotal}M (${bankCount})</span>
+        <span class="opp-bank">&#128176; ${bankDisplay}</span>
       </div>
       ${propsHtml}
     `;
@@ -1842,14 +1930,9 @@ function renderOpponents() {
 // ---- Opponent Overlay ----
 function showOppOverlay(opp) {
   const sheet = document.getElementById('oppOverlaySheet');
-  const bankTotal = opp.bank ? opp.bank.reduce((s, c) => s + c.bankValue, 0) : 0;
-
-  let bankChips = '';
-  if (opp.bank && opp.bank.length > 0) {
-    bankChips = '<div class="oo-bank-chips">' +
-      opp.bank.map(c => `<span class="oo-bank-chip">$${c.bankValue}M</span>`).join('') +
-      '</div>';
-  }
+  const bankCount = opp.bank ? opp.bank.length : 0;
+  const bankTopValue = (opp.bank && opp.bank.length > 0) ? opp.bank[opp.bank.length - 1].bankValue : 0;
+  const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
 
   let propsHtml = '';
   if (opp.properties && opp.properties.length > 0) {
@@ -1877,11 +1960,11 @@ function showOppOverlay(opp) {
     <div class="oo-name">${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:13px">(offline)</span>' : ''}</div>
     <div class="oo-stats">
       <span style="color:var(--muted)">&#127183; ${opp.handCount} cards</span>
-      <span style="color:var(--success);font-weight:700">&#128176; $${bankTotal}M</span>
+      <span style="color:var(--success);font-weight:700">&#128176; ${bankDisplay}</span>
     </div>
     <div class="oo-bank-detail">
       <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px">Bank</div>
-      ${bankChips || '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
+      ${bankCount > 0 ? `<div style="color:var(--muted);font-size:13px">Top card: $${bankTopValue}M &middot; ${bankCount} card${bankCount !== 1 ? 's' : ''} total</div>` : '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
     </div>
     <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Properties</div>
     ${propsHtml}
@@ -2044,7 +2127,7 @@ function buildCardHTML(card) {
       <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2}">WILD</div>
       <div class="hc-body">
         <div class="hc-name" style="color:#333">${esc(card.name)}</div>
-        <div class="hc-desc" style="color:#666">${COLOR_LABELS[card.color]}/${COLOR_LABELS[card.altColor]}</div>
+        <div class="hc-desc" style="color:#666">${COLOR_LABELS[card.color]} / ${COLOR_LABELS[card.altColor]}</div>
       </div>
       <div class="hc-footer">Wild Property</div>
     `;
@@ -2180,7 +2263,7 @@ function showActionPanel(card, anchorEl) {
       return;
     }
     const div = document.createElement('div');
-    div.className = 'ap-item';
+    div.className = 'ap-item' + (item.highlight ? ' highlight' : '');
     div.textContent = item.label;
     div.addEventListener('click', () => {
       closeActionPanel();
@@ -2292,9 +2375,46 @@ function flashTargeted() {
 // ============================================================
 // CARD ACTIONS
 // ============================================================
+function findDoubleRentCard() {
+  if (!gameState || !gameState.you || !gameState.you.hand) return null;
+  return gameState.you.hand.find(c => c.type === 'action_double_rent') || null;
+}
+
+function canDoubleRent(card) {
+  if (gameState.actionsRemaining < 2) return false;
+  const drc = findDoubleRentCard();
+  return drc && drc.id !== card.id;
+}
+
+function playDoubledRent(doubleRentCard, rentCard, color, targetPlayerId) {
+  // Send double rent first, then the rent card action
+  sendAction('play_double_rent', { cardId: doubleRentCard.id });
+  setTimeout(() => {
+    const payload = { cardId: rentCard.id, targetColor: color };
+    if (targetPlayerId) payload.targetPlayerId = targetPlayerId;
+    sendAction('play_rent_card', payload);
+  }, 200);
+}
+
+function playDoubledDebtCollector(doubleRentCard, actionCard, targetPlayerId) {
+  sendAction('play_double_rent', { cardId: doubleRentCard.id });
+  setTimeout(() => {
+    sendAction('play_debt_collector', { cardId: actionCard.id, targetPlayerId });
+  }, 200);
+}
+
+function playDoubledBirthday(doubleRentCard, actionCard) {
+  sendAction('play_double_rent', { cardId: doubleRentCard.id });
+  setTimeout(() => {
+    sendAction('play_birthday', { cardId: actionCard.id });
+  }, 200);
+}
+
 function getActionsForCard(card) {
   const items = [];
   const t = card.type;
+  const drc = findDoubleRentCard();
+  const canDouble = canDoubleRent(card);
 
   if (t === 'money') {
     items.push({ label: `Bank $${card.bankValue}M`, action: () => bankMoney(card), flies: true });
@@ -2319,22 +2439,37 @@ function getActionsForCard(card) {
       card.rentColors.forEach(c => {
         items.push({ label: `Charge ${COLOR_LABELS[c]} rent`, action: () => playRent(card, c, null), flies: true });
       });
+      if (canDouble) {
+        items.push({ divider: true });
+        card.rentColors.forEach(c => {
+          items.push({ label: `Charge ${COLOR_LABELS[c]} rent (Doubled!) — 2 actions`, action: () => playDoubledRent(drc, card, c, null), flies: true, highlight: true });
+        });
+      }
     }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'rent_wild') {
     items.push({ label: 'Charge rent...', action: () => pickColorThenPlayerForWildRent(card) });
+    if (canDouble) {
+      items.push({ label: 'Charge rent (Doubled!) — 2 actions', action: () => pickColorThenPlayerForDoubledWildRent(card, drc), highlight: true });
+    }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_debt_collector') {
     items.push({ label: 'Play Debt Collector...', action: () => pickPlayerForAction(card, 'play_debt_collector') });
+    if (canDouble) {
+      items.push({ label: 'Debt Collector (Doubled!) — 2 actions', action: () => pickPlayerForDoubledDebtCollector(card, drc), highlight: true });
+    }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_its_my_birthday') {
     items.push({ label: "Play It's My Birthday", action: () => playBirthday(card), flies: true });
+    if (canDouble) {
+      items.push({ label: "Birthday (Doubled!) — 2 actions", action: () => playDoubledBirthday(drc, card), flies: true, highlight: true });
+    }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
@@ -2364,8 +2499,7 @@ function getActionsForCard(card) {
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_double_rent') {
-    items.push({ label: 'Play Double Rent', action: () => playDoubleRent(card), flies: true });
-    items.push({ divider: true });
+    // Double Rent only shown as bank option — it's used as a modifier on rent/charge cards
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'action_just_say_no') {
@@ -2425,6 +2559,31 @@ function pickPlayerForWildRent(card, color) {
   openPicker('Choose target', gameState.opponents.map(opp => ({
     label: opp.name,
     action: () => { closePicker(); playRent(card, color, opp.id); }
+  })));
+}
+
+// ---- Doubled Wild Rent: pick color then pick player ----
+function pickColorThenPlayerForDoubledWildRent(card, doubleRentCard) {
+  const myColors = gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  if (myColors.length === 0) { toast('No properties to charge rent for'); return; }
+  openPicker('Choose rent color (Doubled!)', myColors.map(c => ({
+    label: COLOR_LABELS[c],
+    color: COLOR_CSS[c],
+    action: () => {
+      closePicker();
+      openPicker('Choose target (Doubled!)', gameState.opponents.map(opp => ({
+        label: opp.name,
+        action: () => { closePicker(); playDoubledRent(doubleRentCard, card, c, opp.id); }
+      })));
+    }
+  })));
+}
+
+// ---- Doubled Debt Collector: pick player ----
+function pickPlayerForDoubledDebtCollector(card, doubleRentCard) {
+  openPicker('Choose target (Doubled!)', gameState.opponents.map(opp => ({
+    label: opp.name,
+    action: () => { closePicker(); playDoubledDebtCollector(doubleRentCard, card, opp.id); }
   })));
 }
 
