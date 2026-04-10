@@ -2,7 +2,7 @@
 // MONOPOLY DEAL ONLINE — Bot AI Tests
 // ============================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { applyAction, EngineResult, initializeGame } from "../engine/GameEngine";
 import { chooseBotAction, BotDifficulty } from "../engine/BotPlayer";
 import { BotManager } from "../engine/BotManager";
@@ -661,5 +661,146 @@ describe("BotManager", () => {
     // Name should be available again
     const b2 = mgr.createBot("easy");
     expect(b2.name).toBe(name1);
+  });
+});
+
+// ============================================================
+// SERVER-LEVEL BOT SCHEDULING TESTS
+// ============================================================
+
+import { GameRoom } from "../server/GameRoom";
+import { WebSocket } from "ws";
+import { ServerMessageType } from "../shared/types";
+
+function createMockWs(): WebSocket & { _sent: string[] } {
+  const sent: string[] = [];
+  return {
+    readyState: WebSocket.OPEN,
+    send: vi.fn((data: string) => { sent.push(data); }),
+    ping: vi.fn(),
+    terminate: vi.fn(),
+    on: vi.fn(),
+    _sent: sent,
+  } as unknown as WebSocket & { _sent: string[] };
+}
+
+function parseSent(ws: WebSocket & { _sent: string[] }): any[] {
+  return ws._sent.map((s) => JSON.parse(s));
+}
+
+describe("Bot Turn Scheduling (Server)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("bot draws and plays through its turn when it goes first", () => {
+    const ws1 = createMockWs();
+    const room = new GameRoom("BSCHED", "human1", "Human", 0, ws1 as WebSocket, "tok1");
+
+    // Add a hard bot
+    const addResult = room.addBot("hard");
+    expect(addResult.success).toBe(true);
+    const botId = addResult.bot!.id;
+
+    // Start game — bot might be first or second
+    room.startGame("human1");
+    expect(room.gameState).not.toBeNull();
+
+    const gs = room.gameState!;
+    const firstPlayerId = gs.players[gs.currentPlayerIndex].id;
+
+    if (firstPlayerId === botId) {
+      // Bot goes first — it's in Draw phase, a bot turn should be scheduled
+      expect(gs.phase).toBe(TurnPhase.Draw);
+
+      // Clear sent messages to track new ones
+      ws1._sent.length = 0;
+
+      // Advance past bot turn delay (up to 1500ms)
+      vi.advanceTimersByTime(2000);
+
+      // Bot should have drawn cards — check that state updates were broadcast
+      const updates = parseSent(ws1).filter((m) => m.type === "game_state_update");
+      expect(updates.length).toBeGreaterThanOrEqual(1);
+
+      // The bot should have acted — phase should have advanced past Draw
+      // (bot draws, then plays or ends turn)
+      const lastUpdate = updates[updates.length - 1];
+      const lastState = lastUpdate.payload.state;
+      // Bot should have at least drawn (moved past Draw phase for its turn)
+      // After multiple delays, the bot may have completed its entire turn
+      // The key assertion: the game is NOT stuck in Draw phase for the bot
+      const currentId = lastState.you
+        ? gs.players[lastState.currentPlayerIndex]?.id
+        : null;
+      // If it's still the bot's turn, it should be in Play phase (already drew)
+      // If the bot finished its turn, the human should be current
+      if (currentId === botId) {
+        expect(lastState.phase).not.toBe("draw");
+      }
+    } else {
+      // Human goes first — end turn to give bot a turn
+      room.processAction({ type: ActionType.DrawCards, playerId: "human1" });
+      room.processAction({ type: ActionType.EndTurn, playerId: "human1" });
+
+      // Now it's the bot's turn in Draw phase
+      expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(botId);
+      expect(room.gameState!.phase).toBe(TurnPhase.Draw);
+
+      ws1._sent.length = 0;
+
+      // Advance to let bot act
+      vi.advanceTimersByTime(2000);
+
+      const updates = parseSent(ws1).filter((m) => m.type === "game_state_update");
+      expect(updates.length).toBeGreaterThanOrEqual(1);
+    }
+
+    // Game should NOT be stuck — verify it hasn't crashed
+    expect(room.gameState!.phase).not.toBe(TurnPhase.GameOver);
+  });
+
+  it("bot takes multiple actions per turn with delays between each", () => {
+    const ws1 = createMockWs();
+    const room = new GameRoom("BMULTI", "human1", "Human", 0, ws1 as WebSocket, "tok1");
+
+    room.addBot("hard");
+    room.startGame("human1");
+
+    const gs = room.gameState!;
+    const botPlayer = gs.players.find((p) => p.id !== "human1")!;
+    const botId = botPlayer.id;
+
+    // If human goes first, play through their turn
+    if (gs.players[gs.currentPlayerIndex].id === "human1") {
+      room.processAction({ type: ActionType.DrawCards, playerId: "human1" });
+      room.processAction({ type: ActionType.EndTurn, playerId: "human1" });
+    }
+
+    // Bot's turn — advance through multiple bot action delays
+    // Each action takes 800-1500ms, bot can do up to 4 actions (draw + 3 plays)
+    ws1._sent.length = 0;
+
+    for (let i = 0; i < 8; i++) {
+      vi.advanceTimersByTime(2000);
+      // If turn already advanced to human, stop
+      if (
+        room.gameState!.players[room.gameState!.currentPlayerIndex].id !== botId
+      ) break;
+    }
+
+    // Bot should have completed its turn (or game ended)
+    const currentId = room.gameState!.players[room.gameState!.currentPlayerIndex].id;
+    // Either human's turn now or game over
+    const gameOver = room.gameState!.phase === TurnPhase.GameOver;
+    expect(currentId === "human1" || gameOver).toBe(true);
+
+    // Should have received multiple state updates from bot actions
+    const updates = parseSent(ws1).filter((m) => m.type === "game_state_update");
+    expect(updates.length).toBeGreaterThanOrEqual(2); // At least draw + end turn
   });
 });

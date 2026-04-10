@@ -211,7 +211,12 @@ export function totalAssetsValue(player: PlayerState): number {
 // Note: In Monopoly Deal, if you can't pay the full amount, you pay what you can.
 // You're never "bankrupt" — you just give everything you have.
 export function canPayAnything(player: PlayerState): boolean {
-  return player.bank.length > 0 || player.properties.some((g) => g.cards.length > 0);
+  if (player.bank.length > 0) return true;
+  // PropertyWildAll cards ($0 value) cannot be used for payment —
+  // only count property groups that have at least one non-PropertyWildAll card
+  return player.properties.some((g) =>
+    g.cards.some((c) => c.type !== CardType.PropertyWildAll)
+  );
 }
 
 // ---- Card Type Checks ----

@@ -367,55 +367,20 @@ export class GameRoom {
     this.clearTimers();
     this.broadcastGameState(`${botInfo.name} (Bot) replaced a disconnected player`);
 
-    // Schedule bot action if it's their turn
-    this.scheduleBotActionIfNeeded();
+    // Set up timers, then check if the bot should act
+    this.setupTimersForCurrentState();
+    this.checkBotSchedule();
 
     return { success: true, bot: { id: botInfo.id, name: botInfo.name } };
   }
 
-  private scheduleBotActionIfNeeded(): void {
-    if (!this.gameState) return;
-
-    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-
-    // Check if current player is a bot and it's their turn
-    if (
-      this.botManager.isBotPlayer(currentPlayer.id) &&
-      (this.gameState.phase === TurnPhase.Draw ||
-        this.gameState.phase === TurnPhase.Play ||
-        this.gameState.phase === TurnPhase.Discard)
-    ) {
-      this.scheduleBotTurn(currentPlayer.id);
-      return;
-    }
-
-    // Check if a bot needs to respond to a pending action
-    if (
-      this.gameState.phase === TurnPhase.AwaitingResponse &&
-      this.gameState.pendingAction
-    ) {
-      const pa = this.gameState.pendingAction;
-      const unrespondedBot = pa.targetPlayerIds.find(
-        (id) =>
-          !pa.respondedPlayerIds.includes(id) &&
-          this.botManager.isBotPlayer(id)
-      );
-      if (unrespondedBot) {
-        this.scheduleBotResponse(unrespondedBot);
-        return;
-      }
-    }
-
-    // No bot needs to act — set up normal timers for human players
-    this.setupTimersForCurrentState();
-  }
-
   private scheduleBotTurn(botId: string): void {
-    // Clear any existing bot timer for this bot
     const existing = this.botTimers.get(botId);
     if (existing) clearTimeout(existing);
 
-    const delay = 800 + Math.random() * 1200; // 800-2000ms
+    const botName = this.botManager.getBotInfo(botId)?.name || botId;
+    const delay = 800 + Math.floor(Math.random() * 700); // 800-1500ms
+    console.log(`[Bot] Scheduling turn for ${botName} in ${delay}ms`);
     const timer = setTimeout(() => {
       this.botTimers.delete(botId);
       this.processBotTurn(botId);
@@ -427,7 +392,9 @@ export class GameRoom {
     const existing = this.botTimers.get(botId);
     if (existing) clearTimeout(existing);
 
-    const delay = 1000 + Math.random() * 500; // 1000-1500ms
+    const botName = this.botManager.getBotInfo(botId)?.name || botId;
+    const delay = 1000 + Math.floor(Math.random() * 500); // 1000-1500ms
+    console.log(`[Bot] Scheduling response for ${botName} in ${delay}ms`);
     const timer = setTimeout(() => {
       this.botTimers.delete(botId);
       this.processBotResponse(botId);
@@ -437,28 +404,50 @@ export class GameRoom {
 
   private processBotTurn(botId: string): void {
     if (!this.gameState) return;
+    if (this.gameState.phase === TurnPhase.GameOver) return;
     const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
     if (currentPlayer.id !== botId) return;
 
-    const difficulty = this.botManager.getBotDifficulty(botId) || "medium";
+    const botInfo = this.botManager.getBotInfo(botId);
+    const botName = botInfo?.name || botId;
+    const difficulty = botInfo?.difficulty || "medium";
+
     const action = this.botManager.getBotAction(this.gameState, botId, difficulty);
+    console.log(`[Bot] ${botName} plays ${action.type}`);
 
-    this.processAction(action);
+    const result = this.processAction(action);
 
-    // After processing, schedule next bot action if needed
-    this.checkBotSchedule();
+    if (!result.success) {
+      // Bot made an illegal move — log and force end turn to prevent stuck game
+      console.error(`[Bot] ${botName} error: ${result.error} — forcing EndTurn`);
+      this.processAction({ type: ActionType.EndTurn, playerId: botId });
+    }
+
+    // processAction calls setupTimersForCurrentState + checkBotSchedule,
+    // which will schedule the next bot action if the bot still needs to act.
+    // But if the turn advanced to a bot (Draw phase), we need an explicit check
+    // because checkBotSchedule runs inside processAction's success path.
+    // If processAction failed and we forced EndTurn, the forced EndTurn's
+    // processAction already handles it.
   }
 
   private processBotResponse(botId: string): void {
     if (!this.gameState || !this.gameState.pendingAction) return;
+    if (this.gameState.phase === TurnPhase.GameOver) return;
 
-    const difficulty = this.botManager.getBotDifficulty(botId) || "medium";
+    const botInfo = this.botManager.getBotInfo(botId);
+    const botName = botInfo?.name || botId;
+    const difficulty = botInfo?.difficulty || "medium";
+
     const action = this.botManager.getBotAction(this.gameState, botId, difficulty);
+    console.log(`[Bot] ${botName} responds with ${action.type}`);
 
-    this.processAction(action);
+    const result = this.processAction(action);
 
-    // After processing, schedule next bot action if needed
-    this.checkBotSchedule();
+    if (!result.success) {
+      console.error(`[Bot] ${botName} response error: ${result.error} — auto-accepting`);
+      this.processAction({ type: ActionType.AcceptAction, playerId: botId });
+    }
   }
 
   // ---- Game Start ----
@@ -489,20 +478,22 @@ export class GameRoom {
       }))
     );
 
-    // Send initial state to all players
-    this.broadcastGameState("Game started!");
-
-    // Start turn timer for the first player (or schedule bot)
-    const firstPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    if (this._hasBots && this.botManager.isBotPlayer(firstPlayer.id)) {
-      // Mark bots as connected and schedule their turn
+    // Mark bots as connected in game state (bots have no WebSocket but are always "present")
+    if (this._hasBots) {
       for (const p of this.gameState.players) {
         if (this.botManager.isBotPlayer(p.id)) p.connected = true;
       }
-      this.scheduleBotTurn(firstPlayer.id);
-    } else {
-      this.startTurnTimer(firstPlayer.id);
     }
+
+    // Send initial state to all players
+    this.broadcastGameState("Game started!");
+
+    // Start turn timer for the first player
+    const firstPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
+    this.startTurnTimer(firstPlayer.id);
+
+    // If first player is a bot, override with bot scheduling
+    if (this._hasBots) this.checkBotSchedule();
 
     return { success: true };
   }
@@ -581,6 +572,9 @@ export class GameRoom {
 
     // Set up timers based on new game phase
     this.setupTimersForCurrentState();
+
+    // If a bot now needs to act, override the human timer with bot scheduling
+    if (this._hasBots) this.checkBotSchedule();
 
     return { success: true };
   }
