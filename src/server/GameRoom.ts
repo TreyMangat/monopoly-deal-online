@@ -562,6 +562,7 @@ export class GameRoom {
   private filterStateForPlayer(playerId: string): ClientGameState {
     const gs = this.gameState!;
     const you = gs.players.find((p) => p.id === playerId)!;
+    const yourPlayerIndex = gs.players.findIndex((p) => p.id === playerId);
 
     const opponents: OpponentView[] = gs.players
       .filter((p) => p.id !== playerId)
@@ -579,6 +580,7 @@ export class GameRoom {
       roomCode: gs.roomCode,
       phase: gs.phase,
       currentPlayerIndex: gs.currentPlayerIndex,
+      yourPlayerIndex,
       actionsRemaining: gs.actionsRemaining,
       turnNumber: gs.turnNumber,
       drawPileCount: gs.deck.length,

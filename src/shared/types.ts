@@ -220,6 +220,7 @@ export interface ClientGameState {
   roomCode: string;
   phase: TurnPhase;
   currentPlayerIndex: number;
+  yourPlayerIndex: number; // this player's index in the server's players array
   actionsRemaining: number;
   turnNumber: number;
   drawPileCount: number;

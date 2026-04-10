@@ -154,6 +154,7 @@ struct ClientGameState: Codable, Equatable {
     let roomCode: String
     let phase: TurnPhase
     let currentPlayerIndex: Int
+    let yourPlayerIndex: Int
     let actionsRemaining: Int
     let turnNumber: Int
     let drawPileCount: Int

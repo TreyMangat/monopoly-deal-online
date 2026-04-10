@@ -48,7 +48,8 @@ final class GameViewModel {
     }
 
     var isMyTurn: Bool {
-        currentState?.currentPlayerIndex == 0
+        guard let state = currentState else { return false }
+        return state.currentPlayerIndex == state.yourPlayerIndex
     }
 
     var isPaymentPending: Bool {

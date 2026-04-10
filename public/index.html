@@ -771,49 +771,45 @@ function renderGame() {
   }
 }
 
-function getAllPlayersOrdered() {
-  if (!gameState) return [];
-  return [gameState.you, ...gameState.opponents];
+function isMyTurn() {
+  if (!gameState) return false;
+  return gameState.currentPlayerIndex === gameState.yourPlayerIndex;
 }
 
 function getCurrentTurnPlayerName() {
   if (!gameState) return '?';
-  const opps = gameState.opponents;
-  const totalP = opps.length + 1;
-  for (let myIdx = 0; myIdx < totalP; myIdx++) {
-    const test = [];
-    let oi = 0;
-    for (let i = 0; i < totalP; i++) {
-      if (i === myIdx) test.push(gameState.you);
-      else test.push(opps[oi++]);
-    }
-    let consistent = true;
-    let oi2 = 0;
-    for (let i = 0; i < totalP; i++) {
-      if (i === myIdx) continue;
-      if (test[i].id !== opps[oi2].id) { consistent = false; break; }
-      oi2++;
-    }
-    if (consistent) {
-      const cp = test[gameState.currentPlayerIndex];
-      return cp ? cp.name : '?';
+  if (isMyTurn()) return gameState.you.name;
+  // Reconstruct full player order to find the current turn player's name.
+  // The server's players array has us at yourPlayerIndex and opponents fill the rest in order.
+  const totalP = gameState.opponents.length + 1;
+  const players = [];
+  let oi = 0;
+  for (let i = 0; i < totalP; i++) {
+    if (i === gameState.yourPlayerIndex) {
+      players.push(gameState.you);
+    } else {
+      players.push(gameState.opponents[oi++]);
     }
   }
-  return '?';
-}
-
-function isMyTurn() {
-  if (!gameState) return false;
-  return getCurrentTurnPlayerName() === gameState.you.name;
+  const cp = players[gameState.currentPlayerIndex];
+  return cp ? cp.name : '?';
 }
 
 function renderOpponents() {
   const strip = document.getElementById('opponentsStrip');
   strip.innerHTML = '';
-  const currentName = getCurrentTurnPlayerName();
-  gameState.opponents.forEach(opp => {
+  // Build a set of opponent indices in the server's player order
+  const totalP = gameState.opponents.length + 1;
+  const oppIndices = [];
+  let oi = 0;
+  for (let i = 0; i < totalP; i++) {
+    if (i === gameState.yourPlayerIndex) continue;
+    oppIndices.push({ serverIdx: i, opp: gameState.opponents[oi++] });
+  }
+  gameState.opponents.forEach((opp, idx) => {
+    const serverIdx = oppIndices[idx] ? oppIndices[idx].serverIdx : -1;
     const div = document.createElement('div');
-    div.className = 'opp-card' + (opp.name === currentName ? ' is-turn' : '');
+    div.className = 'opp-card' + (serverIdx === gameState.currentPlayerIndex ? ' is-turn' : '');
     div.dataset.playerId = opp.id;
 
     let propsHtml = '';
