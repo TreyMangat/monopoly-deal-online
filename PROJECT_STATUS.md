@@ -1,6 +1,6 @@
 # PROJECT STATUS — Monopoly Deal Online
 
-> **Last updated:** Sprint 3 complete (2026-04-10)
+> **Last updated:** Sprint 4 in progress (2026-04-10)
 > **Repo:** github.com/TreyMangat/monopoly-deal-online
 > **Owner:** Trey
 
@@ -10,30 +10,45 @@
 
 - **Server:** Node.js + TypeScript + `ws` WebSocket library
 - **Game Engine:** Pure TypeScript, server-authoritative, no I/O
-- **Client (current):** Browser test client (vanilla HTML/CSS/JS)
-- **Client (planned):** iOS SwiftUI app
-- **Hosting target:** Render free tier (Docker)
+- **Web Client:** Browser client (vanilla HTML/CSS/JS) — PWA-enabled
+- **iOS Client:** SwiftUI app (28 Swift files)
+- **Hosting:** Render free tier (Docker) — https://monopoly-deal-online.onrender.com
 - **Multiplayer:** WebSocket, 2-6 players across different networks
 - **Room system:** 6-char alphanumeric codes, host starts game
+
+## Codebase Stats
+
+| Metric | Count |
+|---|---|
+| TypeScript (server) | 3,440 LOC (12 files) |
+| TypeScript (tests) | 1,703 LOC (3 files) |
+| **TypeScript total** | **5,143 LOC** |
+| Swift (iOS client) | 5,455 LOC (28 files) |
+| Web client (HTML/CSS/JS) | 1,498 LOC (1 file) |
+| Tests passing | 51 (32 engine + 11 server + 8 integration) |
 
 ## File Map
 
 ```
-src/shared/types.ts        — All TypeScript interfaces and enums
-src/shared/constants.ts    — Numeric game rules (set sizes, rent tiers)
-src/shared/cardData.ts     — All 106 cards, deck builder
-src/shared/protocol.ts     — WebSocket message helpers
-src/engine/GameEngine.ts   — Core: initializeGame() + applyAction()
-src/engine/helpers.ts      — Rent calc, set checking, shuffle, lookups
-src/server/GameRoom.ts     — Single game room (state + broadcast)
-src/server/RoomManager.ts  — Room lifecycle (create, join, cleanup)
-src/server/index.ts        — HTTP + WebSocket entry point
-src/__tests__/engine.test.ts — Vitest engine unit tests (32)
-src/__tests__/server-hardening.test.ts — Timer + disconnect tests (11)
-src/__tests__/full-game.test.ts — Full-game integration tests (8)
-public/index.html          — Browser test client (Sprint 2)
-scripts/test-connection.ts — E2E WebSocket test script
-CLAUDE.md                  — Claude Code project context
+src/shared/types.ts          273 — All TypeScript interfaces and enums
+src/shared/constants.ts       80 — Numeric game rules (set sizes, rent tiers)
+src/shared/cardData.ts       444 — All 106 cards, deck builder
+src/shared/protocol.ts       106 — WebSocket message helpers
+src/engine/GameEngine.ts    1040 — Core: initializeGame() + applyAction()
+src/engine/helpers.ts        283 — Rent calc, set checking, shuffle, lookups
+src/server/GameRoom.ts       648 — Single game room (state + broadcast)
+src/server/RoomManager.ts    210 — Room lifecycle (create, join, cleanup)
+src/server/index.ts          356 — HTTP + WebSocket entry point
+src/__tests__/engine.test.ts           898 — Vitest engine unit tests (32)
+src/__tests__/server-hardening.test.ts 384 — Timer + disconnect tests (11)
+src/__tests__/full-game.test.ts        421 — Full-game integration tests (8)
+public/index.html           1498 — Web client (PWA, card rendering)
+public/manifest.json          24 — PWA manifest
+public/service-worker.js     101 — Offline support + cache strategy
+public/icons/                    — PWA icons (192px, 512px)
+scripts/test-connection.ts   227 — E2E WebSocket test script
+ios/                             — SwiftUI iOS client (28 files, see ios/CLAUDE.md)
+CLAUDE.md                     96 — Claude Code project context
 ```
 
 ## Completed Work
@@ -69,18 +84,21 @@ CLAUDE.md                  — Claude Code project context
 - [x] Action history log
 - [x] Game over screen
 
-### Sprint 3.5 (current) — Xcode Integration & Testing
-- [ ] Create Xcode project and add all Swift files
-- [ ] Connect to live Render server and test
-- [ ] Fix any compilation issues
-- [ ] Test full game flow on simulator
-- [ ] Test on physical iPhone
-
-### Sprint 4 (planned) — Polish
-- [ ] Card artwork / programmatic rendering
-- [ ] Animations (card flip, slide, deal)
+### Sprint 4 (in progress) — PWA + Polish
+- [x] PWA manifest + service worker (offline support)
+- [x] PWA icons (192px, 512px)
+- [x] Card rendering — color-coded backgrounds by type (property/money/action/rent)
+- [x] Wild card gradients (2-color split, rainbow for wild-all)
+- [x] Card layout: bank value badge, centered name, type label
+- [x] Hover effects (scale + shadow)
+- [x] Your-turn pulsing teal border indicator
+- [x] Action toast notifications (3s centered popup on each play)
+- [x] Room code: monospace font + copy-to-clipboard button
+- [x] Mobile responsive card sizing (viewport < 400px)
+- [ ] Card animations (flip, slide, deal)
 - [ ] Sound effects
-- [ ] Haptic feedback
+- [ ] Haptic feedback (iOS)
+- [ ] Xcode integration testing on simulator + physical device
 - [ ] App Store prep
 
 ## Game Rules — Quick Reference
