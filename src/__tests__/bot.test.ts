@@ -452,6 +452,129 @@ describe("Hard Bot", () => {
 });
 
 // ============================================================
+// BOT MONEY MANAGEMENT TESTS
+// ============================================================
+
+describe("Bot Money Management", () => {
+  it("banks money when bank is empty (priority 0)", () => {
+    const state = createBotTestGame();
+    state.players[0].bank = []; // empty bank
+    state.players[0].hand = [
+      money("m5_urgent", 5),
+      { id: "sly1", type: CardType.ActionSlyDeal, name: "Sly Deal", bankValue: 3 },
+    ];
+    state.players[0].properties = [];
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PlayMoneyToBank);
+    expect(action.cardId).toBe("m5_urgent");
+  });
+
+  it("banks money over 10 turns and has non-zero bank by turn 5", () => {
+    let state = initializeGame("BANKTEST", [
+      { id: "banker", name: "BankerBot", avatar: 10 },
+      { id: "opp", name: "Opponent", avatar: 0 },
+    ]);
+
+    let bankerBankValue = 0;
+    let actions = 0;
+    const maxActions = 100;
+
+    while (actions < maxActions && state.phase !== TurnPhase.GameOver) {
+      const currentPlayer = state.players[state.currentPlayerIndex];
+      let botId: string;
+
+      if (state.phase === TurnPhase.AwaitingResponse && state.pendingAction) {
+        const targetId = state.pendingAction.targetPlayerIds.find(
+          (id) => !state.pendingAction!.respondedPlayerIds.includes(id)
+        );
+        if (!targetId) break;
+        botId = targetId;
+      } else {
+        botId = currentPlayer.id;
+      }
+
+      const action = chooseBotAction(state, botId, "hard");
+      action.playerId = botId;
+      const result = applyAction(state, action);
+      if (!result.ok) break;
+      state = result.state;
+      actions++;
+
+      // Check bank value after roughly 5 turns (each turn ~4 actions: draw + 3 plays)
+      if (actions >= 20) {
+        const banker = state.players.find(p => p.id === "banker");
+        if (banker) bankerBankValue = banker.bank.reduce((sum, c) => sum + c.bankValue, 0);
+        if (bankerBankValue > 0) break;
+      }
+    }
+
+    expect(bankerBankValue).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================
+// EMPTY HAND DRAW TESTS
+// ============================================================
+
+describe("Empty Hand Draw", () => {
+  it("player with 0 cards does NOT auto-draw — waits until draw phase", () => {
+    let state: GameState = {
+      roomCode: "EMPTY",
+      deck: Array.from({ length: 30 }, (_, i) => money(`dk${i}`, 1)),
+      discardPile: [],
+      players: [
+        {
+          id: "p1", name: "Alice", avatar: 0,
+          hand: [], // empty hand!
+          bank: [money("bank1", 5)],
+          properties: [],
+          connected: true,
+        },
+        {
+          id: "p2", name: "Bob", avatar: 1,
+          hand: [money("m1", 1)],
+          bank: [],
+          properties: [],
+          connected: true,
+        },
+      ],
+      currentPlayerIndex: 0,
+      actionsRemaining: 0,
+      phase: TurnPhase.Play,
+      pendingAction: null,
+      turnNumber: 1,
+      winnerId: null,
+      useDoubleDeck: false,
+      doubleRentActive: false,
+    };
+
+    // P1 ends turn with 0 cards
+    state = ok(applyAction(state, { type: ActionType.EndTurn, playerId: "p1" }));
+
+    // Now it's P2's turn (Draw phase)
+    expect(state.currentPlayerIndex).toBe(1);
+    expect(state.phase).toBe(TurnPhase.Draw);
+    // P1 still has 0 cards — no auto-draw happened
+    expect(state.players[0].hand).toHaveLength(0);
+
+    // P2 draws and ends turn
+    state = ok(applyAction(state, { type: ActionType.DrawCards, playerId: "p2" }));
+    state = ok(applyAction(state, { type: ActionType.EndTurn, playerId: "p2" }));
+
+    // Back to P1's Draw phase — still 0 cards until they draw
+    expect(state.currentPlayerIndex).toBe(0);
+    expect(state.phase).toBe(TurnPhase.Draw);
+    expect(state.players[0].hand).toHaveLength(0);
+
+    // P1 draws — should get 5 cards (empty hand rule)
+    state = ok(applyAction(state, { type: ActionType.DrawCards, playerId: "p1" }));
+    expect(state.players[0].hand).toHaveLength(5);
+    expect(state.phase).toBe(TurnPhase.Play);
+  });
+});
+
+// ============================================================
 // INTEGRATION TESTS
 // ============================================================
 

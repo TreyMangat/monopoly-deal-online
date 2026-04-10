@@ -231,7 +231,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .opp-card .opp-hand{color:var(--muted);font-size:12px}
 .opp-card .opp-bank{color:var(--success);font-size:14px;font-weight:700}
 .opp-props{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.opp-prop-stack{display:flex;align-items:center;position:relative;height:32px}
+.opp-prop-stack{display:flex;flex-wrap:wrap;align-items:center;position:relative;min-height:32px}
 .opp-prop-mini{width:22px;height:32px;border-radius:3px;border:1px solid rgba(255,255,255,.25);
   font-size:7px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;
   margin-left:-6px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.4);
@@ -241,6 +241,9 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   overflow:hidden;max-height:28px;padding:1px}
 .opp-prop-stack.complete{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
 .opp-prop-label{font-size:10px;color:var(--muted);margin-left:5px;display:flex;align-items:center;font-weight:600}
+.opp-prop-color-label{font-size:8px;font-weight:800;letter-spacing:.5px;display:block;
+  margin-bottom:2px;margin-left:0;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.opp-wild-badge{font-size:8px;position:absolute;bottom:0;right:0;line-height:1}
 
 /* ---- Opponent Overlay ---- */
 #oppOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,12,30,.75);
@@ -2012,10 +2015,24 @@ function renderOpponents() {
         const complete = g.cards.length >= (SET_SIZES[g.color] || 3);
         const bgColor = COLOR_HEX[g.color] || '#666';
         const txtColor = isLightColor(g.color) ? '#222' : '#fff';
+        const colorName = (COLOR_LABELS[g.color] || g.color).toUpperCase();
         propsHtml += `<div class="opp-prop-stack${complete ? ' complete' : ''}">`;
+        propsHtml += `<span class="opp-prop-color-label" style="color:${bgColor}">${colorName}</span>`;
         g.cards.forEach((c, ci) => {
-          const initials = c.name.split(' ').map(w => w[0]).join('');
-          propsHtml += `<div class="opp-prop-mini" style="background:${bgColor};z-index:${ci};color:${txtColor}" title="${esc(c.name)}"><span class="opm-name">${esc(initials)}</span></div>`;
+          const isWild = c.type === 'property_wild';
+          const isWildAll = c.type === 'property_wild_all';
+          let cardBg = `background:${bgColor}`;
+          let wildBadge = '';
+          if (isWildAll) {
+            cardBg = 'background:linear-gradient(135deg,#DC143C,#FF8C00,#FFD700,#228B22,#00008B,#E75480)';
+            wildBadge = '<span class="opp-wild-badge">&#11088;</span>';
+          } else if (isWild && c.color && c.altColor) {
+            const c1 = COLOR_HEX[c.color] || bgColor;
+            const c2 = COLOR_HEX[c.altColor] || bgColor;
+            cardBg = `background:linear-gradient(135deg,${c1} 50%,${c2} 50%)`;
+            wildBadge = '<span class="opp-wild-badge">&#11088;</span>';
+          }
+          propsHtml += `<div class="opp-prop-mini" style="${cardBg};z-index:${ci};color:${txtColor}" title="${esc(c.name)}">${wildBadge}</div>`;
         });
         propsHtml += `<span class="opp-prop-label">${g.cards.length}/${SET_SIZES[g.color] || '?'}</span></div>`;
       });
@@ -2258,6 +2275,23 @@ function getRentChargeForCard(card) {
     }
   });
   return best > 0 ? best : null;
+}
+
+function getRentForColor(color) {
+  if (!gameState) return 0;
+  const me = gameState.you;
+  const g = me.properties.find(pg => pg.color === color);
+  if (!g || g.cards.length === 0) return 0;
+  const tier = RENT_TABLE[color];
+  if (!tier) return 0;
+  const idx = Math.min(g.cards.length - 1, tier.length - 1);
+  let rent = tier[idx];
+  const complete = g.cards.length >= (SET_SIZES[color] || 3);
+  if (complete && color !== 'railroad' && color !== 'utility') {
+    if (g.hasHouse) rent += 3;
+    if (g.hasHotel) rent += 4;
+  }
+  return rent;
 }
 
 function buildCardHTML(card) {
@@ -2619,23 +2653,36 @@ function getActionsForCard(card) {
   }
   else if (t === 'rent_two_color') {
     if (card.rentColors) {
-      card.rentColors.forEach(c => {
-        items.push({ label: `Charge ${COLOR_LABELS[c]} rent`, action: () => playRent(card, c, null), flies: true });
-      });
-      if (canDouble) {
-        items.push({ divider: true });
-        card.rentColors.forEach(c => {
-          items.push({ label: `Charge ${COLOR_LABELS[c]} rent (Doubled!) — 2 actions`, action: () => playDoubledRent(drc, card, c, null), flies: true, highlight: true });
+      const me = gameState.you;
+      const ownedColors = card.rentColors.filter(c => me.properties.some(g => g.color === c && g.cards.length > 0));
+      if (ownedColors.length === 0) {
+        items.push({ label: 'No matching properties — cannot charge rent', action: () => toast('You have no properties of these colors') });
+      } else {
+        ownedColors.forEach(c => {
+          const rentAmt = getRentForColor(c);
+          items.push({ label: `Charge $${rentAmt}M (${COLOR_LABELS[c]})`, action: () => playRent(card, c, null), flies: true });
         });
+        if (canDouble) {
+          items.push({ divider: true });
+          ownedColors.forEach(c => {
+            const rentAmt = getRentForColor(c) * 2;
+            items.push({ label: `Charge $${rentAmt}M (${COLOR_LABELS[c]}) Doubled! — 2 actions`, action: () => playDoubledRent(drc, card, c, null), flies: true, highlight: true });
+          });
+        }
       }
     }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
   }
   else if (t === 'rent_wild') {
-    items.push({ label: 'Charge rent...', action: () => pickColorThenPlayerForWildRent(card) });
-    if (canDouble) {
-      items.push({ label: 'Charge rent (Doubled!) — 2 actions', action: () => pickColorThenPlayerForDoubledWildRent(card, drc), highlight: true });
+    const myColorCount = gameState.you.properties.filter(g => g.cards.length > 0).length;
+    if (myColorCount === 0) {
+      items.push({ label: 'No properties — cannot charge rent', action: () => toast('You have no properties to charge rent for') });
+    } else {
+      items.push({ label: 'Charge rent...', action: () => pickColorThenPlayerForWildRent(card) });
+      if (canDouble) {
+        items.push({ label: 'Charge rent (Doubled!) — 2 actions', action: () => pickColorThenPlayerForDoubledWildRent(card, drc), highlight: true });
+      }
     }
     items.push({ divider: true });
     items.push({ label: `Bank as $${card.bankValue}M`, action: () => bankAction(card), flies: true });
@@ -2804,7 +2851,7 @@ function pickColorThenPlayerForWildRent(card) {
   const myColors = gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color);
   if (myColors.length === 0) { toast('No properties to charge rent for'); return; }
   openPicker('Choose rent color', myColors.map(c => ({
-    label: COLOR_LABELS[c],
+    label: `${COLOR_LABELS[c]} — $${getRentForColor(c)}M`,
     color: COLOR_CSS[c],
     action: () => {
       closePicker();
@@ -3088,8 +3135,17 @@ function submitPayment() {
 function playJSNFromPayment() {
   const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
   if (!jsn) { toast("No Just Say No card"); return; }
-  sendAction('play_just_say_no', { cardId: jsn.id });
-  document.getElementById('paymentModal').classList.remove('active');
+  confirmJSN(() => {
+    sendAction('play_just_say_no', { cardId: jsn.id });
+    document.getElementById('paymentModal').classList.remove('active');
+  });
+}
+
+function confirmJSN(onConfirm) {
+  openPicker('Use Just Say No to block this action?', [
+    { label: 'Yes, block it', action: () => { closePicker(); onConfirm(); }, highlight: true },
+    { label: 'Cancel', action: () => { closePicker(); } }
+  ]);
 }
 
 // ---- Steal Response Modal ----
@@ -3103,8 +3159,10 @@ function showStealResponseModal(pa) {
       label: 'Just Say No!',
       action: () => {
         closePicker();
-        const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
-        sendAction('play_just_say_no', { cardId: jsn.id });
+        confirmJSN(() => {
+          const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
+          sendAction('play_just_say_no', { cardId: jsn.id });
+        });
       }
     });
   }
@@ -3147,8 +3205,10 @@ function showJSNChain(pa) {
 function counterJSN() {
   const jsn = gameState.you.hand.find(c => c.type === 'action_just_say_no');
   if (!jsn) return;
-  sendAction('play_just_say_no', { cardId: jsn.id });
-  document.getElementById('jsnModal').classList.remove('active');
+  confirmJSN(() => {
+    sendAction('play_just_say_no', { cardId: jsn.id });
+    document.getElementById('jsnModal').classList.remove('active');
+  });
 }
 
 function acceptJSN() {

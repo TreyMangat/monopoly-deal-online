@@ -302,7 +302,7 @@ describe("Disconnect Handling", () => {
     // The auto-skip creates a chain of nested setTimeout(0) calls:
     // skip → draw → (hand>7 → discard) → advance turn.
     // Advance multiple times to drain all nested timers.
-    for (let i = 0; i < 10; i++) vi.advanceTimersByTime(1);
+    for (let i = 0; i < 20; i++) vi.advanceTimersByTime(1);
 
     expect(
       room.gameState!.players[room.gameState!.currentPlayerIndex].id

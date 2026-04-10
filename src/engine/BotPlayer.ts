@@ -451,6 +451,13 @@ function chooseHardPlayAction(
 
   const opponents = state.players.filter((p) => p.id !== bot.id);
 
+  // Priority 0: If bank is empty and we have money cards, bank one first
+  // (ensures bot can always pay something when targeted)
+  if (totalBankValue(bot) === 0) {
+    const urgentBank = checkBankMoney(bot);
+    if (urgentBank) return urgentBank;
+  }
+
   // Priority 1: Win check — play property to complete 3rd set
   const winAction = checkWinPlay(bot);
   if (winAction) return winAction;
@@ -499,7 +506,7 @@ function chooseHardPlayAction(
   const debtAction = checkDebtCollector(bot, opponents);
   if (debtAction) return debtAction;
 
-  // Priority 13: Bank money
+  // Priority 13: Bank money (always bank if nothing better to do)
   const bankMoneyAction = checkBankMoney(bot);
   if (bankMoneyAction) return bankMoneyAction;
 
@@ -1095,6 +1102,12 @@ function chooseMediumPlayAction(
   }
 
   const opponents = state.players.filter((p) => p.id !== bot.id);
+
+  // Priority 0: Bank money if bank is empty
+  if (totalBankValue(bot) === 0) {
+    const urgentBank = checkBankMoney(bot);
+    if (urgentBank) return urgentBank;
+  }
 
   // Priority 1: Win check
   const winAction = checkWinPlay(bot);
