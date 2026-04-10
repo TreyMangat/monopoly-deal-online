@@ -1,6 +1,6 @@
 # PROJECT STATUS — Monopoly Deal Online
 
-> **Last updated:** Sprint 2 complete (2026-04-10)
+> **Last updated:** Sprint 3 complete (2026-04-10)
 > **Repo:** github.com/TreyMangat/monopoly-deal-online
 > **Owner:** Trey
 
@@ -28,7 +28,9 @@ src/engine/helpers.ts      — Rent calc, set checking, shuffle, lookups
 src/server/GameRoom.ts     — Single game room (state + broadcast)
 src/server/RoomManager.ts  — Room lifecycle (create, join, cleanup)
 src/server/index.ts        — HTTP + WebSocket entry point
-src/__tests__/engine.test.ts — Vitest unit tests
+src/__tests__/engine.test.ts — Vitest engine unit tests (32)
+src/__tests__/server-hardening.test.ts — Timer + disconnect tests (11)
+src/__tests__/full-game.test.ts — Full-game integration tests (8)
 public/index.html          — Browser test client (Sprint 2)
 scripts/test-connection.ts — E2E WebSocket test script
 CLAUDE.md                  — Claude Code project context
@@ -42,7 +44,7 @@ CLAUDE.md                  — Claude Code project context
 - [x] Just Say No with counter-chain
 - [x] WebSocket server with room codes, join/create/reconnect
 - [x] Per-player state filtering (opponents' hands hidden)
-- [x] 21 unit tests passing
+- [x] 51 tests passing (32 engine + 11 server hardening + 8 integration)
 - [x] Fixed Double Rent — proper typed state field instead of `any` hack
 - [x] Deploy configs: Dockerfile, railway.json, Procfile, render.yaml
 - [x] E2E test script (scripts/test-connection.ts)
@@ -54,18 +56,25 @@ CLAUDE.md                  — Claude Code project context
 - [x] Engine edge cases — reshuffle, payment wilds, house/hotel teardown
 - [x] Deploy to Render — https://monopoly-deal-online.onrender.com
 
-### Sprint 3 (planned) — iOS Client
-- [ ] Xcode project setup (SwiftUI)
-- [ ] WebSocket client layer
-- [ ] Main menu / create / join screens
-- [ ] Game board screen
-- [ ] Card interaction (tap → action sheet)
-- [ ] Payment demand modal
-- [ ] Just Say No chain UI
-- [ ] Opponent inspection view
-- [ ] Discard selection
-- [ ] Action history log
-- [ ] Game over screen
+### Sprint 3 ✅ — iOS Client
+- [x] Xcode project setup (SwiftUI)
+- [x] WebSocket client layer
+- [x] Main menu / create / join screens
+- [x] Game board screen
+- [x] Card interaction (tap → action sheet)
+- [x] Payment demand modal
+- [x] Just Say No chain UI
+- [x] Opponent inspection view
+- [x] Discard selection
+- [x] Action history log
+- [x] Game over screen
+
+### Sprint 3.5 (current) — Xcode Integration & Testing
+- [ ] Create Xcode project and add all Swift files
+- [ ] Connect to live Render server and test
+- [ ] Fix any compilation issues
+- [ ] Test full game flow on simulator
+- [ ] Test on physical iPhone
 
 ### Sprint 4 (planned) — Polish
 - [ ] Card artwork / programmatic rendering
