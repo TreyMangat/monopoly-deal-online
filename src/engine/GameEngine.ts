@@ -112,7 +112,7 @@ function handleDrawCards(
   const count =
     player.hand.length === 0 ? CARDS_TO_DRAW_EMPTY_HAND : CARDS_TO_DRAW;
   const drawn = drawCards(state, count);
-  player.hand.push(...drawn);
+  player.hand.unshift(...drawn);
   state.phase = TurnPhase.Play;
   state.actionsRemaining = MAX_PLAYS_PER_TURN;
   const desc = `${player.name} drew ${drawn.length} card${drawn.length !== 1 ? "s" : ""}`;
@@ -341,9 +341,9 @@ function playPassGo(
   removeCardFromHand(player, action.cardId);
   state.discardPile.push(card);
 
-  // Draw 2 cards
+  // Draw 2 cards (add to front of hand)
   const drawn = drawCards(state, 2);
-  player.hand.push(...drawn);
+  player.hand.unshift(...drawn);
 
   consumePlay(state);
 

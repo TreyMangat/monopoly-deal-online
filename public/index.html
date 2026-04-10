@@ -69,16 +69,15 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 /* ---- Landing ---- */
 #landing{justify-content:center;align-items:center;gap:18px;
   padding:20px;padding-top:calc(20px + var(--safe-top));padding-bottom:calc(20px + var(--safe-bottom));
-  background:linear-gradient(170deg,var(--navy) 0%,var(--teal-dark) 60%,#0d4a5e 100%);
+  background:url('/images/landing-bg.png') center/cover no-repeat;
   position:relative;overflow:hidden}
 
-/* City skyline silhouette */
-#landing::before{content:'';position:absolute;bottom:0;left:0;right:0;height:120px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 120'%3E%3Cpath d='M0,120 L0,80 L30,80 L30,50 L50,50 L50,30 L65,30 L65,50 L80,50 L80,70 L110,70 L110,40 L125,40 L125,20 L140,20 L140,40 L160,40 L160,60 L180,60 L180,45 L195,45 L195,25 L205,25 L205,45 L220,45 L220,55 L250,55 L250,35 L270,35 L270,10 L285,10 L285,35 L300,35 L300,55 L330,55 L330,75 L350,75 L350,50 L365,50 L365,30 L380,30 L380,50 L400,50 L400,65 L420,65 L420,40 L440,40 L440,15 L455,15 L455,40 L470,40 L470,65 L500,65 L500,45 L520,45 L520,55 L540,55 L540,35 L555,35 L555,20 L570,20 L570,35 L585,35 L585,55 L610,55 L610,70 L640,70 L640,50 L660,50 L660,25 L675,25 L675,50 L690,50 L690,60 L720,60 L720,40 L740,40 L740,55 L760,55 L760,75 L780,75 L780,60 L800,60 L800,120 Z' fill='rgba(5,12,30,0.4)'/%3E%3C/svg%3E") no-repeat bottom/100% 120px;
-  pointer-events:none;z-index:0;opacity:.7}
+/* Dark overlay for readability */
+#landing::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.6);pointer-events:none;z-index:0}
 
 /* Floating emoji decorations */
-.landing-deco{position:absolute;pointer-events:none;font-size:28px;opacity:.15;z-index:0;
+.landing-deco{position:absolute;pointer-events:none;font-size:28px;opacity:.15;z-index:1;
   animation:floatDeco 6s ease-in-out infinite}
 .landing-deco:nth-child(1){top:12%;left:8%;animation-delay:0s}
 .landing-deco:nth-child(2){top:18%;right:10%;animation-delay:1.5s;font-size:24px}
@@ -89,7 +88,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 /* Sparkle particles */
 .sparkle{position:absolute;width:3px;height:3px;border-radius:50%;background:#FFD700;
-  pointer-events:none;z-index:0;opacity:0;animation:sparkleAnim 3s ease-in-out infinite}
+  pointer-events:none;z-index:1;opacity:0;animation:sparkleAnim 3s ease-in-out infinite}
 @keyframes sparkleAnim{0%,100%{opacity:0;transform:scale(0)}50%{opacity:.6;transform:scale(1)}}
 
 /* Title plaque */
@@ -140,7 +139,11 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 /* ---- Lobby ---- */
 #lobby{justify-content:center;align-items:center;gap:16px;
   padding:20px;padding-top:calc(20px + var(--safe-top));
-  background:linear-gradient(170deg,var(--navy) 0%,var(--teal-dark) 60%,#0d4a5e 100%)}
+  background:url('/images/landing-bg.png') center/cover no-repeat;
+  position:relative;overflow:hidden}
+#lobby::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.6);pointer-events:none;z-index:0}
+#lobby>*{position:relative;z-index:1}
 #lobby h1{color:var(--gold-bright);text-shadow:0 2px 12px rgba(255,215,0,.3);
   font-family:'Fredoka',sans-serif;font-weight:700}
 #lobby .lobby-panel{background:rgba(10,22,40,.7);border-radius:20px;border:2px solid rgba(201,169,78,.25);
@@ -487,6 +490,14 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   background:rgba(255,255,255,.15);padding:2px 0;text-align:center;font-size:10px;font-weight:800;
   letter-spacing:2px;color:#fff;backdrop-filter:blur(2px);pointer-events:none}
 
+/* NEW badge on freshly drawn cards */
+.hand-card .new-badge{position:absolute;top:-2px;left:-2px;background:var(--gold-bright);color:#1a1a1a;
+  font-size:7px;font-weight:900;padding:2px 5px;border-radius:0 0 6px 0;z-index:5;
+  letter-spacing:.5px;animation:newBadgeFade 3s ease-out forwards;
+  box-shadow:0 0 8px rgba(255,215,0,.5)}
+.hand-card.is-new{box-shadow:0 4px 12px var(--card-shadow),0 0 12px rgba(255,215,0,.3)}
+@keyframes newBadgeFade{0%,60%{opacity:1}100%{opacity:0}}
+
 /* Breathing animation for waiting state */
 .hand-area.waiting .hand-label{animation:breatheText 3s ease-in-out infinite}
 @keyframes breatheText{0%,100%{opacity:.7}50%{opacity:.4}}
@@ -595,6 +606,16 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);
   border-top:1px solid var(--glass-border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 #discardModal.active .modal{transform:translateY(0)}
+
+/* ---- End Turn Confirm Modal ---- */
+#endTurnConfirmModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,12,30,.6);
+  z-index:300;display:none;justify-content:center;align-items:center;
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#endTurnConfirmModal.active{display:flex}
+#endTurnConfirmModal .modal{background:var(--surface-solid);border-radius:20px;width:92%;max-width:380px;padding:24px;
+  border:1px solid var(--glass-border);box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#endTurnConfirmModal .modal h3{color:var(--warn);font-family:'Fredoka',sans-serif;margin-bottom:8px}
+#endTurnConfirmModal .modal .sub{color:var(--muted);font-size:14px;line-height:1.5}
 
 /* ---- JSN Chain Modal ---- */
 #jsnModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,12,30,.7);
@@ -1026,6 +1047,9 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 <!-- Discard Modal -->
 <div id="discardModal"><div class="modal"><h3>Discard to 7 cards</h3><p class="sub" id="discardInfo">Select cards to discard</p><div id="discardItems"></div><button class="btn-primary" style="margin-top:12px;width:100%" id="discardBtn" onclick="submitDiscard()">Discard</button></div></div>
 
+<!-- End Turn Confirmation Modal -->
+<div id="endTurnConfirmModal"><div class="modal"><h3>End Turn?</h3><p class="sub" id="endTurnConfirmInfo"></p><div class="pay-btn-row" style="margin-top:16px"><button class="btn-secondary" onclick="closeEndTurnConfirm()" style="flex:1">Go Back</button><button class="btn-primary" onclick="confirmEndTurnDiscard()" style="flex:1">Discard Now</button></div></div></div>
+
 <!-- JSN Chain Modal -->
 <div id="jsnModal"><div class="modal"><h3>Just Say No!</h3><div class="chain-history" id="jsnChain"></div><div class="pay-btn-row" style="margin-top:12px"><button class="btn-primary" id="jsnCounterBtn" onclick="counterJSN()" style="flex:1">Counter with Just Say No</button><button class="btn-secondary" onclick="acceptJSN()" style="flex:1">Accept</button></div></div></div>
 
@@ -1067,6 +1091,8 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 let heartbeatInterval = null;
 let lastMessageTime = 0;
+let newCardIds = new Set();
+let newCardTimer = null;
 let heartbeatPongTimer = null;
 let myVote = null;
 let voteCountdown = null;
@@ -1595,17 +1621,28 @@ function handleMessage(msg) {
       }
       break;
     case 'game_started':
-    case 'game_state_update':
+    case 'game_state_update': {
+      const prevHand = gameState ? new Set(gameState.you.hand.map(c => c.id)) : new Set();
       gameState = msg.payload.state;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
         const desc = msg.payload.lastAction.description;
         addLog(desc);
         showActionToast(desc);
         triggerActionAnimations(desc, msg.payload.lastAction);
+        // Track newly drawn cards
+        if (desc.toLowerCase().includes('drew')) {
+          if (newCardTimer) clearTimeout(newCardTimer);
+          newCardIds = new Set();
+          gameState.you.hand.forEach(c => {
+            if (!prevHand.has(c.id)) newCardIds.add(c.id);
+          });
+          newCardTimer = setTimeout(() => { newCardIds = new Set(); renderHand(); }, 3000);
+        }
       }
       renderGame();
       showScreen('game');
       break;
+    }
     case 'action_rejected':
       toast('Rejected: ' + msg.payload.reason);
       haptic('heavy');
@@ -2065,10 +2102,11 @@ function renderHand() {
   me.hand.forEach(card => {
     const div = document.createElement('div');
     const cardClass = getCardClass(card);
-    div.className = 'hand-card ' + cardClass + (selectedCardId === card.id ? ' selected' : '');
+    const isNew = newCardIds.has(card.id);
+    div.className = 'hand-card ' + cardClass + (selectedCardId === card.id ? ' selected' : '') + (isNew ? ' is-new' : '');
     div.dataset.cardId = card.id;
 
-    div.innerHTML = buildCardHTML(card);
+    div.innerHTML = (isNew ? '<div class="new-badge">NEW</div>' : '') + buildCardHTML(card);
 
     div.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2525,7 +2563,28 @@ function playProperty(card, color) { sendAction('play_property_card', { cardId: 
 function playPassGo(card) { sendAction('play_pass_go', { cardId: card.id }); }
 function playBirthday(card) { sendAction('play_birthday', { cardId: card.id }); }
 function playDoubleRent(card) { sendAction('play_double_rent', { cardId: card.id }); }
-function endTurn() { sendAction('end_turn'); }
+function endTurn() {
+  if (!gameState) return;
+  const me = gameState.you;
+  if (me.hand.length > 7) {
+    if (gameState.actionsRemaining > 0) {
+      // Has actions remaining — show confirmation
+      document.getElementById('endTurnConfirmInfo').textContent =
+        `You have ${me.hand.length} cards in hand (max 7). You still have ${gameState.actionsRemaining} action${gameState.actionsRemaining !== 1 ? 's' : ''} remaining. Continue anyway?`;
+      document.getElementById('endTurnConfirmModal').classList.add('active');
+      return;
+    }
+    // No actions left, >7 cards — go straight to end turn (server will trigger discard phase)
+  }
+  sendAction('end_turn');
+}
+function closeEndTurnConfirm() {
+  document.getElementById('endTurnConfirmModal').classList.remove('active');
+}
+function confirmEndTurnDiscard() {
+  document.getElementById('endTurnConfirmModal').classList.remove('active');
+  sendAction('end_turn');
+}
 
 function playRent(card, color, targetPlayerId) {
   const payload = { cardId: card.id, targetColor: color };

@@ -60,18 +60,26 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Serve static files from public/ (manifest, service worker, icons)
+  // Serve static files from public/ (manifest, service worker, icons, images, etc.)
   const MIME_TYPES: Record<string, string> = {
     ".json": "application/json",
     ".js": "application/javascript",
     ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
     ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
     ".webmanifest": "application/manifest+json",
+    ".css": "text/css",
+    ".html": "text/html",
   };
 
+  // Strip query strings before resolving path
+  const urlPath = (req.url || "").split("?")[0];
   const publicDir = path.join(__dirname, "..", "..", "public");
-  const safePath = path.normalize(req.url || "").replace(/^(\.\.[/\\])+/, "");
+  const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(publicDir, safePath);
 
   // Ensure the resolved path stays within public/
@@ -79,6 +87,12 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(403);
     res.end("Forbidden");
     return;
+  }
+
+  // Debug logging for icon requests
+  if (urlPath.startsWith("/icons/")) {
+    const exists = fs.existsSync(filePath);
+    console.log(`[Static] Icon request: ${urlPath} -> ${filePath} (exists: ${exists})`);
   }
 
   try {
