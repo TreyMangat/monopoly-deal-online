@@ -971,6 +971,14 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
     <p class="sub" style="text-align:center;margin:8px 0 16px;color:var(--muted)">Share this code with friends</p>
     <ul class="player-list" id="lobbyPlayers"></ul>
   </div>
+  <div id="addBotArea" style="display:none;width:100%;max-width:380px">
+    <p style="color:var(--muted);font-size:12px;text-align:center;margin-bottom:8px">Add AI Bot</p>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="btn-small" style="background:rgba(46,125,50,.2);color:#4CAF50;border:1px solid rgba(46,125,50,.3)" onclick="addBot('easy')">Easy &#128994;</button>
+      <button class="btn-small" style="background:rgba(255,193,7,.2);color:#FFC107;border:1px solid rgba(255,193,7,.3)" onclick="addBot('medium')">Medium &#128993;</button>
+      <button class="btn-small" style="background:rgba(244,67,54,.2);color:#F44336;border:1px solid rgba(244,67,54,.3)" onclick="addBot('hard')">Hard &#128308;</button>
+    </div>
+  </div>
   <button class="btn-primary" id="startBtn" onclick="startGame()" style="display:none">Start Game</button>
   <p class="sub" id="lobbyWait">Waiting for host to start...</p>
 </div>
@@ -1127,6 +1135,8 @@ let newCardTimer = null;
 let heartbeatPongTimer = null;
 let myVote = null;
 let voteCountdown = null;
+let roomBots = new Set(); // Track bot player IDs
+let disconnectTimestamps = {}; // Track when opponents disconnected
 
 // Track previous turn for animation triggers
 let prevTurnNumber = 0;
@@ -1690,10 +1700,25 @@ function handleMessage(msg) {
     case 'player_left':
       addLog(msg.payload.playerName + ' disconnected');
       break;
+    case 'bot_added':
+      roomBots.add(msg.payload.id);
+      toast(`${msg.payload.name} (Bot) joined`);
+      break;
+    case 'bot_removed':
+      roomBots.delete(msg.payload.botId);
+      break;
     case 'error':
       toast(msg.payload.message || 'Error');
       break;
   }
+}
+
+function addBot(difficulty) {
+  send('add_bot', { roomCode, difficulty });
+}
+
+function replaceWithBot(playerId) {
+  send('replace_with_bot', { roomCode, playerId, difficulty: 'medium' });
 }
 
 // ============================================================
@@ -1738,22 +1763,38 @@ function startGame() {
 // ============================================================
 function renderLobby(room) {
   document.getElementById('lobbyCode').textContent = room.code;
+  if (room.bots) room.bots.forEach(id => roomBots.add(id));
   const ul = document.getElementById('lobbyPlayers');
   ul.innerHTML = '';
   room.players.forEach(p => {
     const li = document.createElement('li');
-    li.textContent = p.name;
+    const isBot = roomBots.has(p.id);
+    li.innerHTML = (isBot ? '<span style="margin-right:6px">&#129302;</span>' : '') + esc(p.name);
     if (p.id === room.hostId) {
       const badge = document.createElement('span');
       badge.className = 'host-badge';
       badge.textContent = 'HOST';
       li.appendChild(badge);
     }
+    if (isBot) {
+      const diffBadge = document.createElement('span');
+      diffBadge.style.cssText = 'font-size:10px;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:50px;margin-left:8px;color:var(--muted)';
+      diffBadge.textContent = 'BOT';
+      li.appendChild(diffBadge);
+      if (myPlayerId === room.hostId) {
+        const rmBtn = document.createElement('span');
+        rmBtn.style.cssText = 'margin-left:auto;color:var(--accent);cursor:pointer;font-size:16px;padding:2px 6px';
+        rmBtn.textContent = '\u00D7';
+        rmBtn.onclick = (e) => { e.stopPropagation(); send('remove_bot', { roomCode, botId: p.id }); };
+        li.appendChild(rmBtn);
+      }
+    }
     ul.appendChild(li);
   });
   const isHost = myPlayerId === room.hostId;
   document.getElementById('startBtn').style.display = isHost ? '' : 'none';
   document.getElementById('lobbyWait').style.display = isHost ? 'none' : '';
+  document.getElementById('addBotArea').style.display = isHost ? '' : 'none';
 }
 
 // ============================================================
@@ -1994,13 +2035,26 @@ function renderOpponents() {
     const bankCount = opp.bank ? opp.bank.length : 0;
     const bankTopValue = (opp.bank && opp.bank.length > 0) ? Math.min(...opp.bank.map(c => c.bankValue)) : 0;
     const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
+    const isBot = roomBots.has(opp.id) || opp.avatar >= 10;
+    const botPrefix = isBot ? '&#129302; ' : '';
+    let disconnectReplace = '';
+    if (!opp.connected && !isBot && hostId === myPlayerId) {
+      if (!disconnectTimestamps[opp.id]) disconnectTimestamps[opp.id] = Date.now();
+      const elapsed = Date.now() - disconnectTimestamps[opp.id];
+      if (elapsed >= 10000) {
+        disconnectReplace = `<div style="margin-top:6px"><button class="btn-small" style="background:rgba(233,69,96,.15);color:var(--accent);border:1px solid rgba(233,69,96,.3);font-size:11px;padding:4px 10px" onclick="event.stopPropagation();replaceWithBot('${opp.id}')">Replace with Bot?</button></div>`;
+      }
+    } else if (opp.connected && disconnectTimestamps[opp.id]) {
+      delete disconnectTimestamps[opp.id];
+    }
     div.innerHTML = `
-      <div class="opp-name">${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
+      <div class="opp-name">${botPrefix}${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
       <div class="opp-stats">
         <span class="opp-hand">&#127183; ${opp.handCount} cards</span>
         <span class="opp-bank">&#128176; ${bankDisplay}</span>
       </div>
       ${propsHtml}
+      ${disconnectReplace}
     `;
     div.addEventListener('click', (e) => { e.stopPropagation(); showOppOverlay(opp); });
     strip.appendChild(div);

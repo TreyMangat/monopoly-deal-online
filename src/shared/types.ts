@@ -210,6 +210,8 @@ export enum ServerMessageType {
   TimerUpdate = "timer_update",
   Error = "error",
   Ping = "ping",
+  BotAdded = "bot_added",
+  BotRemoved = "bot_removed",
 }
 
 export interface ServerMessage {
@@ -255,6 +257,9 @@ export enum ClientMessageType {
   LeaveGame = "leave_game",
   Reconnect = "reconnect",
   Pong = "pong",
+  AddBot = "add_bot",
+  RemoveBot = "remove_bot",
+  ReplaceWithBot = "replace_with_bot",
 }
 
 export interface ClientMessage {

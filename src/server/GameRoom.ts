@@ -35,6 +35,7 @@ import {
 import { initializeGame, applyAction } from "../engine/GameEngine";
 import { shuffle } from "../engine/helpers";
 import { serverMsg } from "../shared/protocol";
+import { BotManager, type BotDifficulty } from "../engine/BotManager";
 
 interface ConnectedPlayer {
   id: string;
@@ -75,6 +76,15 @@ export class GameRoom {
 
   // Track if any cards have been played this game (for early quit)
   private cardsPlayedByPlayer: Map<string, number> = new Map();
+
+  // Bot management
+  private _botManager: BotManager | null = null;
+  private _hasBots: boolean = false;
+  get botManager(): BotManager {
+    if (!this._botManager) this._botManager = new BotManager();
+    return this._botManager;
+  }
+  private botTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor(
     code: string,
@@ -254,6 +264,203 @@ export class GameRoom {
     }
   }
 
+  // ---- Bot Management ----
+
+  addBot(difficulty: BotDifficulty): { success: boolean; bot?: { id: string; name: string; avatar: number; difficulty: string }; error?: string } {
+    if (this.status !== RoomStatus.Waiting) {
+      return { success: false, error: "Game already in progress" };
+    }
+    if (this.players.length >= MAX_PLAYERS) {
+      return { success: false, error: "Room is full" };
+    }
+
+    const botInfo = this.botManager.createBot(difficulty);
+    this._hasBots = true;
+
+    this.players.push({
+      id: botInfo.id,
+      name: botInfo.name,
+      avatar: botInfo.avatar,
+      ws: null,
+      sessionToken: `bot_${botInfo.id}`,
+      disconnectedAt: null,
+    });
+
+    this.lastActivityAt = Date.now();
+    this.broadcastRoomInfo();
+
+    return { success: true, bot: { id: botInfo.id, name: botInfo.name, avatar: botInfo.avatar, difficulty } };
+  }
+
+  removeBot(botId: string): { success: boolean; error?: string } {
+    if (!this.botManager.isBotPlayer(botId)) {
+      return { success: false, error: "Not a bot" };
+    }
+
+    this.botManager.removeBot(botId);
+    this.players = this.players.filter((p) => p.id !== botId);
+    this.lastActivityAt = Date.now();
+    this.broadcastRoomInfo();
+
+    return { success: true };
+  }
+
+  replacePlayerWithBot(
+    playerId: string,
+    difficulty: BotDifficulty
+  ): { success: boolean; bot?: { id: string; name: string }; error?: string } {
+    if (!this.gameState || this.status !== RoomStatus.Playing) {
+      return { success: false, error: "No active game" };
+    }
+
+    const playerIdx = this.players.findIndex((p) => p.id === playerId);
+    if (playerIdx === -1) return { success: false, error: "Player not found" };
+
+    const player = this.players[playerIdx];
+
+    // Create bot with a unique name
+    const botInfo = this.botManager.createBot(difficulty);
+    this._hasBots = true;
+
+    // Update ConnectedPlayer entry in-place (keep same array position)
+    player.id = botInfo.id;
+    player.name = botInfo.name;
+    player.avatar = botInfo.avatar;
+    player.ws = null;
+    player.sessionToken = `bot_${botInfo.id}`;
+    player.disconnectedAt = null;
+
+    // Update the GameState player entry
+    const gamePlayer = this.gameState.players.find((p) => p.id === playerId);
+    if (gamePlayer) {
+      gamePlayer.id = botInfo.id;
+      gamePlayer.name = botInfo.name;
+      gamePlayer.avatar = botInfo.avatar;
+      gamePlayer.connected = true;
+    }
+
+    // Update pending action references
+    if (this.gameState.pendingAction) {
+      const pa = this.gameState.pendingAction;
+      if (pa.fromPlayerId === playerId) pa.fromPlayerId = botInfo.id;
+      pa.targetPlayerIds = pa.targetPlayerIds.map((id) =>
+        id === playerId ? botInfo.id : id
+      );
+      pa.respondedPlayerIds = pa.respondedPlayerIds.map((id) =>
+        id === playerId ? botInfo.id : id
+      );
+    }
+
+    // Clean up disconnect timers for old player
+    const disconnectTimer = this.disconnectTimers.get(playerId);
+    if (disconnectTimer) {
+      clearTimeout(disconnectTimer);
+      this.disconnectTimers.delete(playerId);
+    }
+    this.skippedPlayerIds.delete(playerId);
+
+    // Update card tracking
+    const played = this.cardsPlayedByPlayer.get(playerId) || 0;
+    this.cardsPlayedByPlayer.delete(playerId);
+    this.cardsPlayedByPlayer.set(botInfo.id, played);
+
+    this.clearTimers();
+    this.broadcastGameState(`${botInfo.name} (Bot) replaced a disconnected player`);
+
+    // Schedule bot action if it's their turn
+    this.scheduleBotActionIfNeeded();
+
+    return { success: true, bot: { id: botInfo.id, name: botInfo.name } };
+  }
+
+  private scheduleBotActionIfNeeded(): void {
+    if (!this.gameState) return;
+
+    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
+
+    // Check if current player is a bot and it's their turn
+    if (
+      this.botManager.isBotPlayer(currentPlayer.id) &&
+      (this.gameState.phase === TurnPhase.Draw ||
+        this.gameState.phase === TurnPhase.Play ||
+        this.gameState.phase === TurnPhase.Discard)
+    ) {
+      this.scheduleBotTurn(currentPlayer.id);
+      return;
+    }
+
+    // Check if a bot needs to respond to a pending action
+    if (
+      this.gameState.phase === TurnPhase.AwaitingResponse &&
+      this.gameState.pendingAction
+    ) {
+      const pa = this.gameState.pendingAction;
+      const unrespondedBot = pa.targetPlayerIds.find(
+        (id) =>
+          !pa.respondedPlayerIds.includes(id) &&
+          this.botManager.isBotPlayer(id)
+      );
+      if (unrespondedBot) {
+        this.scheduleBotResponse(unrespondedBot);
+        return;
+      }
+    }
+
+    // No bot needs to act — set up normal timers for human players
+    this.setupTimersForCurrentState();
+  }
+
+  private scheduleBotTurn(botId: string): void {
+    // Clear any existing bot timer for this bot
+    const existing = this.botTimers.get(botId);
+    if (existing) clearTimeout(existing);
+
+    const delay = 800 + Math.random() * 1200; // 800-2000ms
+    const timer = setTimeout(() => {
+      this.botTimers.delete(botId);
+      this.processBotTurn(botId);
+    }, delay);
+    this.botTimers.set(botId, timer);
+  }
+
+  private scheduleBotResponse(botId: string): void {
+    const existing = this.botTimers.get(botId);
+    if (existing) clearTimeout(existing);
+
+    const delay = 1000 + Math.random() * 500; // 1000-1500ms
+    const timer = setTimeout(() => {
+      this.botTimers.delete(botId);
+      this.processBotResponse(botId);
+    }, delay);
+    this.botTimers.set(botId, timer);
+  }
+
+  private processBotTurn(botId: string): void {
+    if (!this.gameState) return;
+    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
+    if (currentPlayer.id !== botId) return;
+
+    const difficulty = this.botManager.getBotDifficulty(botId) || "medium";
+    const action = this.botManager.getBotAction(this.gameState, botId, difficulty);
+
+    this.processAction(action);
+
+    // After processing, schedule next bot action if needed
+    this.checkBotSchedule();
+  }
+
+  private processBotResponse(botId: string): void {
+    if (!this.gameState || !this.gameState.pendingAction) return;
+
+    const difficulty = this.botManager.getBotDifficulty(botId) || "medium";
+    const action = this.botManager.getBotAction(this.gameState, botId, difficulty);
+
+    this.processAction(action);
+
+    // After processing, schedule next bot action if needed
+    this.checkBotSchedule();
+  }
+
   // ---- Game Start ----
 
   startGame(requesterId: string): { success: boolean; error?: string } {
@@ -285,9 +492,17 @@ export class GameRoom {
     // Send initial state to all players
     this.broadcastGameState("Game started!");
 
-    // Start turn timer for the first player
+    // Start turn timer for the first player (or schedule bot)
     const firstPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
-    this.startTurnTimer(firstPlayer.id);
+    if (this._hasBots && this.botManager.isBotPlayer(firstPlayer.id)) {
+      // Mark bots as connected and schedule their turn
+      for (const p of this.gameState.players) {
+        if (this.botManager.isBotPlayer(p.id)) p.connected = true;
+      }
+      this.scheduleBotTurn(firstPlayer.id);
+    } else {
+      this.startTurnTimer(firstPlayer.id);
+    }
 
     return { success: true };
   }
@@ -368,6 +583,32 @@ export class GameRoom {
     this.setupTimersForCurrentState();
 
     return { success: true };
+  }
+
+  private checkBotSchedule(): void {
+    if (!this._hasBots) return;
+    if (!this.gameState || this.gameState.phase === TurnPhase.GameOver) return;
+
+    const currentPlayer = this.gameState.players[this.gameState.currentPlayerIndex];
+
+    if (this.gameState.phase === TurnPhase.AwaitingResponse && this.gameState.pendingAction) {
+      const pa = this.gameState.pendingAction;
+      const unrespondedBot = pa.targetPlayerIds.find(
+        (id) => !pa.respondedPlayerIds.includes(id) && this.botManager.isBotPlayer(id)
+      );
+      if (unrespondedBot) {
+        this.clearTimers(); // Cancel human response timer
+        this.scheduleBotResponse(unrespondedBot);
+      }
+    } else if (
+      this.botManager.isBotPlayer(currentPlayer.id) &&
+      (this.gameState.phase === TurnPhase.Play ||
+        this.gameState.phase === TurnPhase.Draw ||
+        this.gameState.phase === TurnPhase.Discard)
+    ) {
+      this.clearTimers(); // Cancel any human timer
+      this.scheduleBotTurn(currentPlayer.id);
+    }
   }
 
   // ---- Timer Management ----
@@ -960,7 +1201,7 @@ export class GameRoom {
 
   // ---- Queries ----
 
-  getRoomInfo(): RoomInfo {
+  getRoomInfo(): RoomInfo & { bots?: string[] } {
     return {
       code: this.code,
       status: this.status,
@@ -972,6 +1213,7 @@ export class GameRoom {
       hostId: this.hostId,
       maxPlayers: MAX_PLAYERS,
       createdAt: this.createdAt,
+      bots: this.botManager.getAllBots().map((b) => b.id),
     };
   }
 
@@ -996,5 +1238,10 @@ export class GameRoom {
       clearTimeout(timer);
     }
     this.disconnectTimers.clear();
+    for (const timer of this.botTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.botTimers.clear();
+    this.botManager.clear();
   }
 }

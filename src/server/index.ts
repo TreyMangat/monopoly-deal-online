@@ -448,6 +448,75 @@ function handleClientMessage(
       break;
     }
 
+    case ClientMessageType.AddBot: {
+      const { roomCode: addBotRoomCode, difficulty } = payload;
+      const addBotRoom = roomManager.getRoom(addBotRoomCode);
+      if (!addBotRoom) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "ROOM_NOT_FOUND", message: "Room not found" }));
+        return;
+      }
+      const addBotRequester = addBotRoom.players.find((p) => p.ws === ws);
+      if (!addBotRequester || addBotRequester.id !== addBotRoom.hostId) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "NOT_HOST", message: "Only the host can add bots" }));
+        return;
+      }
+      const addBotResult = addBotRoom.addBot(difficulty || "medium");
+      if (!addBotResult.success) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "ADD_BOT_FAILED", message: addBotResult.error }));
+      } else {
+        addBotRoom.players.forEach((p) => {
+          if (p.ws?.readyState === WebSocket.OPEN) {
+            p.ws.send(serverMsg(ServerMessageType.BotAdded, addBotResult.bot));
+          }
+        });
+      }
+      break;
+    }
+
+    case ClientMessageType.RemoveBot: {
+      const { roomCode: rmBotRoomCode, botId } = payload;
+      const rmBotRoom = roomManager.getRoom(rmBotRoomCode);
+      if (!rmBotRoom) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "ROOM_NOT_FOUND", message: "Room not found" }));
+        return;
+      }
+      const rmBotRequester = rmBotRoom.players.find((p) => p.ws === ws);
+      if (!rmBotRequester || rmBotRequester.id !== rmBotRoom.hostId) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "NOT_HOST", message: "Only the host can remove bots" }));
+        return;
+      }
+      const rmBotResult = rmBotRoom.removeBot(botId);
+      if (!rmBotResult.success) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "REMOVE_BOT_FAILED", message: rmBotResult.error }));
+      } else {
+        rmBotRoom.players.forEach((p) => {
+          if (p.ws?.readyState === WebSocket.OPEN) {
+            p.ws.send(serverMsg(ServerMessageType.BotRemoved, { botId }));
+          }
+        });
+      }
+      break;
+    }
+
+    case ClientMessageType.ReplaceWithBot: {
+      const { roomCode: replRoomCode, playerId: replPlayerId, difficulty: replDifficulty } = payload;
+      const replRoom = roomManager.getRoom(replRoomCode);
+      if (!replRoom) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "ROOM_NOT_FOUND", message: "Room not found" }));
+        return;
+      }
+      const replRequester = replRoom.players.find((p) => p.ws === ws);
+      if (!replRequester || replRequester.id !== replRoom.hostId) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "NOT_HOST", message: "Only the host can replace players" }));
+        return;
+      }
+      const replResult = replRoom.replacePlayerWithBot(replPlayerId, replDifficulty || "medium");
+      if (!replResult.success) {
+        ws.send(serverMsg(ServerMessageType.Error, { code: "REPLACE_FAILED", message: replResult.error }));
+      }
+      break;
+    }
+
     case ClientMessageType.Pong: {
       // Client responding to our ping — handled by ws 'pong' event
       break;
