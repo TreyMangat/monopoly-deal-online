@@ -298,11 +298,9 @@ describe("Disconnect Handling", () => {
       playerId: p2Id,
     });
 
-    // Should skip player 1 and come back to player 2.
-    // The auto-skip creates a chain of nested setTimeout(0) calls:
-    // skip → draw → (hand>7 → discard) → advance turn.
-    // Advance multiple times to drain all nested timers.
-    for (let i = 0; i < 20; i++) vi.advanceTimersByTime(1);
+    // Should skip player 1 and come back to player 2
+    // (need a tick for the setTimeout(0) skip to fire)
+    vi.advanceTimersByTime(10);
 
     expect(
       room.gameState!.players[room.gameState!.currentPlayerIndex].id

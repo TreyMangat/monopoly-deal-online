@@ -573,9 +573,6 @@ export class GameRoom {
     // Set up timers based on new game phase
     this.setupTimersForCurrentState();
 
-    // If a bot now needs to act, override the human timer with bot scheduling
-    if (this._hasBots) this.checkBotSchedule();
-
     return { success: true };
   }
 
@@ -655,6 +652,11 @@ export class GameRoom {
   }
 
   private startTurnTimer(playerId: string): void {
+    // If this is a bot, schedule bot action instead of human timer
+    if (this._hasBots && this.botManager.isBotPlayer(playerId)) {
+      this.scheduleBotTurn(playerId);
+      return;
+    }
     this.clearTimers();
     this.timerType = "turn";
     this.timerTargetPlayerId = playerId;
@@ -674,6 +676,11 @@ export class GameRoom {
   }
 
   private startResponseTimer(playerId: string, duration: number): void {
+    // If this is a bot, schedule bot response instead of human timer
+    if (this._hasBots && this.botManager.isBotPlayer(playerId)) {
+      this.scheduleBotResponse(playerId);
+      return;
+    }
     this.clearTimers();
     this.timerType = "response";
     this.timerTargetPlayerId = playerId;

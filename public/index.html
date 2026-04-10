@@ -243,7 +243,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .opp-prop-label{font-size:10px;color:var(--muted);margin-left:5px;display:flex;align-items:center;font-weight:600}
 .opp-prop-color-label{font-size:8px;font-weight:800;letter-spacing:.5px;display:block;
   margin-bottom:2px;margin-left:0;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-.opp-wild-badge{font-size:8px;position:absolute;bottom:0;right:0;line-height:1}
+.opp-wild-badge{font-size:7px;position:absolute;top:0;right:0;line-height:1}
 
 /* ---- Opponent Overlay ---- */
 #oppOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,12,30,.75);
@@ -970,6 +970,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 <div id="targetedFlash"></div>
 <div id="stealModal"><div class="steal-sheet pulse-border"><div class="steal-header"><div class="steal-attacker" id="stealAttacker"></div><div class="steal-type" id="stealType"></div></div><div class="steal-body" id="stealBody"></div><div class="steal-desc" id="stealDesc"></div><div class="steal-buttons" id="stealButtons"></div></div></div>
 <div class="nope-slam" id="nopeSlamText">NOPE!</div>
+<div id="payReceivedModal" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:480;display:none;justify-content:center;align-items:center;background:rgba(5,12,30,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)"><div class="modal" style="max-width:340px"><h3 style="color:var(--success);font-family:'Fredoka',sans-serif">Payment Received!</h3><div id="payReceivedBody" style="margin:12px 0"></div><button class="btn-primary" style="width:100%;margin-top:8px" onclick="document.getElementById('payReceivedModal').style.display='none'">OK</button></div></div>
 <div class="steal-success-text" id="stealSuccessText">STEAL!</div>
 
 <!-- Connection Status Banner -->
@@ -1735,6 +1736,8 @@ function handleMessage(msg) {
     case 'game_started':
     case 'game_state_update': {
       const prevHand = gameState ? new Set(gameState.you.hand.map(c => c.id)) : new Set();
+      const prevBank = gameState ? gameState.you.bank.map(c => c.id) : [];
+      const prevPending = gameState ? gameState.pendingAction : null;
       gameState = msg.payload.state;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
         const desc = msg.payload.lastAction.description;
@@ -1749,6 +1752,17 @@ function handleMessage(msg) {
             if (!prevHand.has(c.id)) newCardIds.add(c.id);
           });
           newCardTimer = setTimeout(() => { newCardIds = new Set(); renderHand(); }, 3000);
+        }
+        // Detect payment received: pending action resolved and we were the initiator
+        if (prevPending && prevPending.fromPlayerId === myPlayerId &&
+            desc.toLowerCase().includes('paid') &&
+            (!gameState.pendingAction || gameState.pendingAction !== prevPending)) {
+          const newBankIds = new Set(gameState.you.bank.map(c => c.id));
+          const received = gameState.you.bank.filter(c => !prevBank.includes(c.id));
+          if (received.length > 0) {
+            const payerName = getPlayerName(prevPending.targetPlayerIds.find(id => id !== myPlayerId) || '');
+            showPaymentReceivedModal(payerName, received);
+          }
         }
       }
       renderGame();
@@ -2111,7 +2125,8 @@ function renderOpponents() {
             cardBg = `background:linear-gradient(135deg,${c1} 50%,${c2} 50%)`;
             wildBadge = '<span class="opp-wild-badge">&#11088;</span>';
           }
-          propsHtml += `<div class="opp-prop-mini" style="${cardBg};z-index:${ci};color:${txtColor}" title="${esc(c.name)}">${wildBadge}</div>`;
+          const abbr = getCardAbbr(c);
+          propsHtml += `<div class="opp-prop-mini" style="${cardBg};z-index:${ci};color:${txtColor}" title="${esc(c.name)}"><span class="opm-name">${esc(abbr)}</span>${wildBadge}</div>`;
         });
         propsHtml += `<span class="opp-prop-label">${g.cards.length}/${SET_SIZES[g.color] || '?'}</span></div>`;
       });
@@ -2224,7 +2239,7 @@ function renderMyProperties() {
       const isWild = c.type === 'property_wild' || c.type === 'property_wild_all';
       const wildClass = isWild ? ' pg-card-wild' : '';
       const wildClick = isWild ? ` onclick="onPropertyWildClick('${c.id}','${g.color}')"` : '';
-      cardsHtml += `<div class="pg-card-mini${wildClass}" style="background:${bgColor};z-index:${ci}"${wildClick} title="${esc(c.name)}"><div class="mini-name">${esc(c.name.split(' ').map(w=>w[0]).join(''))}</div>${isWild ? '<div class="wild-rotate-icon">&#8635;</div>' : ''}</div>`;
+      cardsHtml += `<div class="pg-card-mini${wildClass}" style="background:${bgColor};z-index:${ci}"${wildClick} title="${esc(c.name)}"><div class="mini-name">${esc(getCardAbbr(c))}</div>${isWild ? '<div class="wild-rotate-icon">&#8635;</div>' : ''}</div>`;
     });
     cardsHtml += '</div>';
 
@@ -3371,13 +3386,25 @@ function showStealSuccessEffect() {
   void el.offsetWidth;
   el.classList.add('active');
   sfxStealSuccess();
-  // Gold flash
   const flash = document.getElementById('targetedFlash');
   flash.style.background = 'rgba(255,215,0,.25)';
   flash.classList.remove('active');
   void flash.offsetWidth;
   flash.classList.add('active');
   setTimeout(() => { flash.style.background = ''; el.classList.remove('active'); flash.classList.remove('active'); }, 700);
+}
+
+function showPaymentReceivedModal(payerName, cards) {
+  const body = document.getElementById('payReceivedBody');
+  let html = `<p style="color:var(--muted);font-size:13px;margin-bottom:8px">From <strong style="color:var(--cream)">${esc(payerName)}</strong>:</p>`;
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  cards.forEach(c => {
+    html += `<div style="background:rgba(39,174,96,.1);padding:4px 10px;border-radius:50px;font-size:12px;color:var(--success);font-weight:600;border:1px solid rgba(39,174,96,.2)">$${c.bankValue}M ${esc(c.name)}</div>`;
+  });
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById('payReceivedModal').style.display = 'flex';
+  sfxMoney();
 }
 
 // ============================================================
@@ -3522,7 +3549,7 @@ function showGameOver(payload) {
           const div = document.createElement('div');
           div.className = 'prop-group complete';
           div.innerHTML = `<div class="pg-header"><span class="pg-color" style="color:${bgColor}">${COLOR_LABELS[g.color]}</span><span class="pg-complete">COMPLETE &#10003;</span></div>
-            <div class="pg-cards">${g.cards.map((c,ci) => `<div class="pg-card-mini" style="background:${bgColor};z-index:${ci}"><div class="mini-name">${esc(c.name.split(' ').map(w=>w[0]).join(''))}</div></div>`).join('')}</div>`;
+            <div class="pg-cards">${g.cards.map((c,ci) => `<div class="pg-card-mini" style="background:${bgColor};z-index:${ci}"><div class="mini-name">${esc(getCardAbbr(c))}</div></div>`).join('')}</div>`;
           setsDiv.appendChild(div);
         }
       });
@@ -3645,6 +3672,18 @@ function esc(str) {
   const d = document.createElement('div');
   d.textContent = str || '';
   return d.innerHTML;
+}
+
+function getCardAbbr(card) {
+  if (!card || !card.name) return '?';
+  if (card.type === 'property_wild_all') return 'W';
+  if (card.type === 'property_wild') return 'W';
+  const words = card.name.split(' ');
+  // Use first 3 letters of first meaningful word for short names,
+  // or initials for multi-word names
+  if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
+  // Skip common words like "the", capitalize initials
+  return words.map(w => w[0]).join('').toUpperCase().substring(0, 3);
 }
 
 function toast(msg) {

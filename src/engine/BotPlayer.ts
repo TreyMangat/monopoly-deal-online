@@ -38,6 +38,10 @@ import {
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
+// Track wild cards swapped this turn to prevent infinite loops
+const swappedWildIds = new Set<string>();
+let lastBotTurnNumber = -1;
+
 // ---- Main Entry Point ----
 
 export function chooseBotAction(
@@ -45,6 +49,11 @@ export function chooseBotAction(
   botId: string,
   difficulty: BotDifficulty
 ): PlayerAction {
+  // Reset swap tracking on new turn
+  if (state.turnNumber !== lastBotTurnNumber) {
+    swappedWildIds.clear();
+    lastBotTurnNumber = state.turnNumber;
+  }
   const bot = state.players.find((p) => p.id === botId);
   if (!bot) {
     return { type: ActionType.EndTurn, playerId: botId };
@@ -609,14 +618,17 @@ function checkDealBreaker(
   const dbCard = bot.hand.find((c) => c.type === CardType.ActionDealBreaker);
   if (!dbCard) return null;
 
-  let bestTarget: { oppId: string; color: PropertyColor; rent: number } | null = null;
+  let bestTarget: { oppId: string; color: PropertyColor; score: number } | null = null;
 
   for (const opp of opponents) {
+    const oppCompleteSets = countCompleteSets(opp);
     for (const g of opp.properties) {
       if (!isSetComplete(g)) continue;
       const rent = calculateRent(g, false);
-      if (!bestTarget || rent > bestTarget.rent) {
-        bestTarget = { oppId: opp.id, color: g.color, rent };
+      // Prioritize: opponents closest to winning, then highest rent value
+      const score = oppCompleteSets * 100 + rent;
+      if (!bestTarget || score > bestTarget.score) {
+        bestTarget = { oppId: opp.id, color: g.color, score };
       }
     }
   }
@@ -749,10 +761,13 @@ function checkSlyDeal(
   } | null = null;
 
   for (const opp of opponents) {
+    const oppThreat = countCompleteSets(opp); // Higher = more urgent to disrupt
     for (const g of opp.properties) {
       if (isSetComplete(g)) continue;
       for (const card of g.cards) {
-        const score = scoreSlyDealTarget(bot, card, g.color);
+        let score = scoreSlyDealTarget(bot, card, g.color);
+        // Bonus for disrupting opponents closest to winning
+        score += oppThreat * 20;
         if (score > 0 && (!bestSteal || score > bestSteal.score)) {
           bestSteal = { oppId: opp.id, cardId: card.id, score };
         }
@@ -797,6 +812,9 @@ function checkWildCardSwap(bot: PlayerState): PlayerAction | null {
       )
         continue;
 
+      // Never swap the same wild twice in one turn (prevents infinite loops)
+      if (swappedWildIds.has(card.id)) continue;
+
       const possibleColors = getPlayableColorsForWild(card, bot);
       for (const destColor of possibleColors) {
         if (destColor === group.color) continue;
@@ -805,30 +823,11 @@ function checkWildCardSwap(bot: PlayerState): PlayerAction | null {
         const destCount = destGroup ? destGroup.cards.length : 0;
         const destNeeded = SET_SIZE[destColor];
         const srcCount = group.cards.length;
-        const srcNeeded = SET_SIZE[group.color];
 
-        // Would this move complete the destination set?
-        if (destCount === destNeeded - 1) {
-          // Worth it even if source loses completion (net same or better)
-          return {
-            type: ActionType.MoveWildCard,
-            playerId: bot.id,
-            cardId: card.id,
-            destinationColor: destColor,
-          };
-        }
-
-        // Move closer to completion: dest gets closer, source doesn't lose a complete set
-        const destProgress = (destCount + 1) / destNeeded;
-        const srcProgress = (srcCount - 1) / srcNeeded;
-        const currentSrcProgress = srcCount / srcNeeded;
-        const currentDestProgress = destCount / destNeeded;
-
-        if (
-          destProgress > currentDestProgress &&
-          destProgress > currentSrcProgress &&
-          !isSetComplete(group)
-        ) {
+        // ONLY swap if it immediately completes the destination set
+        // AND destination has strictly more cards than source after swap
+        if (destCount === destNeeded - 1 && destCount >= srcCount - 1) {
+          swappedWildIds.add(card.id);
           return {
             type: ActionType.MoveWildCard,
             playerId: bot.id,
@@ -984,11 +983,14 @@ function checkDebtCollector(
   const card = bot.hand.find((c) => c.type === CardType.ActionDebtCollector);
   if (!card) return null;
 
-  // Target richest opponent
+  // Score opponents: prefer rich opponents with fewer cards (less JSN risk)
   const target = opponents.reduce((a, b) => {
-    const aVal = totalBankValue(a) || totalAssetsValue(a);
-    const bVal = totalBankValue(b) || totalAssetsValue(b);
-    return aVal >= bVal ? a : b;
+    const aBank = totalBankValue(a);
+    const bBank = totalBankValue(b);
+    // Penalize high hand count (more likely to hold JSN)
+    const aScore = aBank + totalAssetsValue(a) - a.hand.length * 2;
+    const bScore = bBank + totalAssetsValue(b) - b.hand.length * 2;
+    return aScore >= bScore ? a : b;
   });
 
   return {
