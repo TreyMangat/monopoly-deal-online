@@ -39,6 +39,7 @@ import {
   removeCardFromProperties,
   removeCardFromBank,
   getOrCreatePropertyGroup,
+  getBestGroupForColor,
   isSetComplete,
   countCompleteSets,
   hasWon,
@@ -272,8 +273,8 @@ function playPropertyCard(
     if (!hasAnyProperties) {
       return { ok: false, error: "Rainbow wild cannot be played until you have at least one property" };
     }
-    const existingGroup = player.properties.find((g) => g.color === destColor && g.cards.length > 0);
-    if (!existingGroup) {
+    const hasColorGroup = player.properties.some((g) => g.color === destColor && g.cards.length > 0);
+    if (!hasColorGroup) {
       return { ok: false, error: "Rainbow wild can only be placed on a color you already have properties in" };
     }
   } else {
@@ -398,9 +399,9 @@ function playRentCard(
     return { ok: false, error: "Card is not a rent card" };
   }
 
-  // Must have properties of that color
-  const group = player.properties.find((g) => g.color === action.targetColor);
-  if (!group || group.cards.length === 0) {
+  // Must have properties of that color — use best group for rent calculation
+  const group = getBestGroupForColor(player, action.targetColor!);
+  if (!group) {
     return { ok: false, error: "You have no properties of that color" };
   }
 
@@ -640,7 +641,7 @@ function playDealBreaker(
 
   // Target must have a COMPLETE set of this color
   const targetGroup = target.properties.find(
-    (g) => g.color === action.targetColor
+    (g) => g.color === action.targetColor && isSetComplete(g)
   );
   if (!targetGroup || !isSetComplete(targetGroup)) {
     return { ok: false, error: "Target does not have a complete set of that color" };
@@ -1087,16 +1088,14 @@ function handleAcceptAction(
     }
     case PendingActionType.RespondToDealBreaker: {
       const targetColor = pending.targetCardId as unknown as PropertyColor;
+      // Find a COMPLETE set of this color (Deal Breaker only targets complete sets)
       const groupIndex = player.properties.findIndex(
-        (g) => g.color === targetColor
+        (g) => g.color === targetColor && isSetComplete(g)
       );
       if (groupIndex !== -1) {
         const stolenGroup = player.properties.splice(groupIndex, 1)[0];
-        // Transfer entire group including house/hotel
-        const newGroup = getOrCreatePropertyGroup(fromPlayer, stolenGroup.color);
-        newGroup.cards.push(...stolenGroup.cards);
-        newGroup.hasHouse = stolenGroup.hasHouse;
-        newGroup.hasHotel = stolenGroup.hasHotel;
+        // Transfer entire group directly to attacker (preserve as separate set)
+        fromPlayer.properties.push(stolenGroup);
       }
       break;
     }

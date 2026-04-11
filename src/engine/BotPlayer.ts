@@ -35,6 +35,7 @@ import {
   isActionCard,
   isPropertyCard,
   findCardInProperties,
+  getBestGroupForColor,
 } from "./helpers";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
@@ -475,8 +476,8 @@ function enumerateLegalActions(
     // Rent cards
     if (card.type === CardType.RentTwoColor && card.rentColors) {
       for (const color of card.rentColors) {
-        const g = bot.properties.find((pg) => pg.color === color);
-        if (g && g.cards.length > 0) {
+        const g = getBestGroupForColor(bot, color);
+        if (g) {
           actions.push({
             type: ActionType.PlayRentCard,
             playerId: bot.id,
@@ -752,8 +753,11 @@ function checkWinPlay(bot: PlayerState): PlayerAction | null {
 
     const colors = getPlayableColors(card, bot);
     for (const color of colors) {
-      const group = bot.properties.find((g) => g.color === color);
-      const currentCount = group ? group.cards.length : 0;
+      // Find the incomplete group the card would be added to (matches getOrCreatePropertyGroup)
+      const incGroup = bot.properties.find(
+        (g) => g.color === color && !isSetComplete(g)
+      );
+      const currentCount = incGroup ? incGroup.cards.length : 0;
       const needed = SET_SIZE[color];
       if (currentCount === needed - 1) {
         // This card completes this set!
@@ -914,7 +918,7 @@ function checkDoubleRentCombo(
   if (!rentCard) return null;
 
   // Only use double rent if we have 2+ properties of that color
-  const group = bot.properties.find((g) => g.color === rentCard.targetColor);
+  const group = getBestGroupForColor(bot, rentCard.targetColor);
   if (!group || group.cards.length < 2) return null;
 
   return {
@@ -933,7 +937,7 @@ function checkRent(
   const rentInfo = findBestRentCard(bot, opponents);
   if (!rentInfo) return null;
 
-  const group = bot.properties.find((g) => g.color === rentInfo.targetColor);
+  const group = getBestGroupForColor(bot, rentInfo.targetColor);
   if (!group || group.cards.length < 2) return null;
 
   const action: PlayerAction = {
@@ -960,8 +964,8 @@ function findBestRentCard(
   for (const card of bot.hand) {
     if (card.type === CardType.RentTwoColor && card.rentColors) {
       for (const color of card.rentColors) {
-        const group = bot.properties.find((g) => g.color === color);
-        if (!group || group.cards.length === 0) continue;
+        const group = getBestGroupForColor(bot, color);
+        if (!group) continue;
         const rent = calculateRent(group, false);
         if (!best || rent > best.rent) {
           best = { card, targetColor: color, rent };
@@ -1046,7 +1050,7 @@ function scoreSlyDealTarget(
   card: Card,
   color: PropertyColor
 ): number {
-  const botGroup = bot.properties.find((g) => g.color === color);
+  const botGroup = bot.properties.find((g) => g.color === color && !isSetComplete(g));
   const currentCount = botGroup ? botGroup.cards.length : 0;
   const needed = SET_SIZE[color];
 
@@ -1111,8 +1115,8 @@ function checkWildCardSwap(bot: PlayerState): PlayerAction | null {
       for (const destColor of possibleColors) {
         if (destColor === group.color) continue;
 
-        const destGroup = bot.properties.find((g) => g.color === destColor);
-        const destCount = destGroup ? destGroup.cards.length : 0;
+        const destIncGroup = bot.properties.find((g) => g.color === destColor && !isSetComplete(g));
+        const destCount = destIncGroup ? destIncGroup.cards.length : 0;
         const destNeeded = SET_SIZE[destColor];
         const srcCount = group.cards.length;
 
@@ -1155,8 +1159,8 @@ function checkPlayPropertyEarlyGame(
   for (const card of candidates) {
     const colors = getPlayableColors(card, bot);
     for (const color of colors) {
-      const group = bot.properties.find((g) => g.color === color);
-      const currentCount = group ? group.cards.length : 0;
+      const incGroup = bot.properties.find((g) => g.color === color && !isSetComplete(g));
+      const currentCount = incGroup ? incGroup.cards.length : 0;
       const needed = SET_SIZE[color];
 
       // AVOID completing sets in early game — they become Deal Breaker targets
@@ -1209,8 +1213,8 @@ function checkPlayPropertyMidGame(
   for (const card of candidates) {
     const colors = getPlayableColors(card, bot);
     for (const color of colors) {
-      const group = bot.properties.find((g) => g.color === color);
-      const currentCount = group ? group.cards.length : 0;
+      const incGroup = bot.properties.find((g) => g.color === color && !isSetComplete(g));
+      const currentCount = incGroup ? incGroup.cards.length : 0;
       const needed = SET_SIZE[color];
 
       const afterCount = currentCount + 1;
@@ -1273,8 +1277,8 @@ function checkPlayPropertyLateGame(
   for (const card of propertyCards) {
     const colors = getPlayableColors(card, bot);
     for (const color of colors) {
-      const group = bot.properties.find((g) => g.color === color);
-      const currentCount = group ? group.cards.length : 0;
+      const incGroup = bot.properties.find((g) => g.color === color && !isSetComplete(g));
+      const currentCount = incGroup ? incGroup.cards.length : 0;
       const needed = SET_SIZE[color];
 
       const afterCount = currentCount + 1;
@@ -1476,7 +1480,7 @@ function checkBankActionCardsEarly(
       isUsable = false;
     } else if (card.type === CardType.RentTwoColor && card.rentColors) {
       isUsable = card.rentColors.some((c) => {
-        const g = bot.properties.find((pg) => pg.color === c);
+        const g = getBestGroupForColor(bot, c);
         return g && g.cards.length >= 2;
       });
     } else if (card.type === CardType.RentWild) {
@@ -1550,8 +1554,8 @@ function checkBankUnusableActions(
       );
     } else if (card.type === CardType.RentTwoColor && card.rentColors) {
       isUsable = card.rentColors.some((c) => {
-        const g = bot.properties.find((pg) => pg.color === c);
-        return g && g.cards.length > 0;
+        const g = getBestGroupForColor(bot, c);
+        return !!g;
       });
     } else if (card.type === CardType.RentWild) {
       isUsable = bot.properties.some((g) => g.cards.length > 0);
@@ -1629,7 +1633,7 @@ function chooseMediumPlayAction(
   for (const card of bot.hand) {
     if (card.type === CardType.RentTwoColor && card.rentColors) {
       for (const color of card.rentColors) {
-        const g = bot.properties.find((pg) => pg.color === color);
+        const g = getBestGroupForColor(bot, color);
         if (g && g.cards.length >= 2) {
           return {
             type: ActionType.PlayRentCard,
@@ -1947,8 +1951,8 @@ function scoreCardForKeeping(bot: PlayerState, card: Card): number {
     const colors = getPlayableColors(card, bot);
     let bestScore = 5;
     for (const color of colors) {
-      const group = bot.properties.find((g) => g.color === color);
-      const currentCount = group ? group.cards.length : 0;
+      const incGroup = bot.properties.find((g) => g.color === color && !isSetComplete(g));
+      const currentCount = incGroup ? incGroup.cards.length : 0;
       const needed = SET_SIZE[color];
       if (currentCount === needed - 1) {
         bestScore = Math.max(bestScore, 100);

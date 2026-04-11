@@ -2351,7 +2351,7 @@ function renderOpponents() {
     }
     // Compact props summary for mobile 4+ player mode
     const propCount = opp.properties ? opp.properties.reduce((s, g) => s + g.cards.length, 0) : 0;
-    const completeSets = opp.properties ? opp.properties.filter(g => g.cards.length >= (SET_SIZES[g.color] || 3)).length : 0;
+    const completeSets = opp.properties ? new Set(opp.properties.filter(g => g.cards.length >= (SET_SIZES[g.color] || 3)).map(g => g.color)).size : 0;
     const compactPropsHtml = `<div class="opp-compact-props">${
       opp.properties && opp.properties.length > 0
         ? opp.properties.map(g => {
@@ -2571,11 +2571,11 @@ function getRentChargeForCard(card) {
   if (!me || !me.properties) return null;
   let colors = [];
   if (card.type === 'rent_two_color' && card.rentColors) colors = card.rentColors;
-  else if (card.type === 'rent_wild') colors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  else if (card.type === 'rent_wild') colors = [...new Set(me.properties.filter(g => g.cards.length > 0).map(g => g.color))];
   let best = 0;
   colors.forEach(c => {
-    const g = me.properties.find(pg => pg.color === c);
-    if (g && g.cards.length > 0) {
+    const g = getBestGroup(me.properties, c);
+    if (g) {
       const tier = RENT_TABLE[c];
       if (tier) {
         const idx = Math.min(g.cards.length - 1, tier.length - 1);
@@ -2586,11 +2586,18 @@ function getRentChargeForCard(card) {
   return best > 0 ? best : null;
 }
 
+function getBestGroup(props, color) {
+  const groups = (props || []).filter(g => g.color === color && g.cards.length > 0);
+  if (groups.length === 0) return null;
+  if (groups.length === 1) return groups[0];
+  // Pick group with most cards (complete set > incomplete)
+  return groups.reduce((best, g) => g.cards.length > best.cards.length ? g : best);
+}
 function getRentForColor(color) {
   if (!gameState) return 0;
   const me = gameState.you;
-  const g = me.properties.find(pg => pg.color === color);
-  if (!g || g.cards.length === 0) return 0;
+  const g = getBestGroup(me.properties, color);
+  if (!g) return 0;
   const tier = RENT_TABLE[color];
   if (!tier) return 0;
   const idx = Math.min(g.cards.length - 1, tier.length - 1);
@@ -2957,7 +2964,7 @@ function getActionsForCard(card) {
   else if (t === 'property_wild_all') {
     // Rainbow wild requires existing properties to place on
     const me = gameState.you;
-    const existingColors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+    const existingColors = [...new Set(me.properties.filter(g => g.cards.length > 0).map(g => g.color))];
     if (existingColors.length > 0) {
       items.push({ label: 'Play to color...', action: () => pickColorForWild(card) });
     } else {
@@ -3104,7 +3111,7 @@ function playRent(card, color, targetPlayerId) {
 function pickColorForWild(card) {
   // Rainbow wild: only show colors where the player already has properties
   const me = gameState.you;
-  const existingColors = me.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  const existingColors = [...new Set(me.properties.filter(g => g.cards.length > 0).map(g => g.color))];
   if (existingColors.length === 0) { toast('Need properties first'); return; }
   openPicker('Choose color', existingColors.map(c => ({
     label: COLOR_LABELS[c],
@@ -3166,7 +3173,7 @@ function onPropertyWildClick(cardId, currentColor) {
 
 // ---- Wild Rent: pick color then pick player ----
 function pickColorThenPlayerForWildRent(card) {
-  const myColors = gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  const myColors = [...new Set(gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color))];
   if (myColors.length === 0) { toast('No properties to charge rent for'); return; }
   openPicker('Choose rent color', myColors.map(c => ({
     label: `${COLOR_LABELS[c]} — $${getRentForColor(c)}M`,
@@ -3187,7 +3194,7 @@ function pickPlayerForWildRent(card, color) {
 
 // ---- Doubled Wild Rent: pick color then pick player ----
 function pickColorThenPlayerForDoubledWildRent(card, doubleRentCard) {
-  const myColors = gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color);
+  const myColors = [...new Set(gameState.you.properties.filter(g => g.cards.length > 0).map(g => g.color))];
   if (myColors.length === 0) { toast('No properties to charge rent for'); return; }
   openPicker('Choose rent color (Doubled!)', myColors.map(c => ({
     label: COLOR_LABELS[c],
@@ -3520,7 +3527,8 @@ function showStealModal(pa) {
   } else if (pa.type === 'respond_to_deal_breaker') {
     const targetColor = pa.targetCardId; // stored as color string
     const colorLabel = (COLOR_LABELS[targetColor] || targetColor || '').toUpperCase();
-    const myGroup = gameState.you.properties.find(g => g.color === targetColor);
+    const myGroup = gameState.you.properties.find(g => g.color === targetColor && g.cards.length >= (SET_SIZES[g.color] || 3))
+      || gameState.you.properties.find(g => g.color === targetColor);
     let fanned = '';
     if (myGroup) {
       fanned = '<div class="steal-set-fan">';

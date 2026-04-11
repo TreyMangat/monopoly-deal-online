@@ -54,16 +54,45 @@ export function getPropertyGroup(
   return player.properties.find((g) => g.color === color);
 }
 
+/**
+ * Find an incomplete group of the given color, or create a new one.
+ * If all existing groups of this color are complete, a fresh group is created.
+ * This allows multiple sets of the same color (e.g. 3/3 Green + 1/3 Green).
+ */
 export function getOrCreatePropertyGroup(
   player: PlayerState,
   color: PropertyColor
 ): PropertyGroup {
-  let group = player.properties.find((g) => g.color === color);
-  if (!group) {
-    group = { color, cards: [], hasHouse: false, hasHotel: false };
-    player.properties.push(group);
-  }
+  // Prefer an existing incomplete group
+  const incomplete = player.properties.find(
+    (g) => g.color === color && !isSetComplete(g)
+  );
+  if (incomplete) return incomplete;
+
+  // All groups of this color are complete (or none exist) — create a new one
+  const group: PropertyGroup = { color, cards: [], hasHouse: false, hasHotel: false };
+  player.properties.push(group);
   return group;
+}
+
+/**
+ * Find the group of a color with the highest rent (for rent card charging).
+ * Returns the complete set with house/hotel bonuses if one exists,
+ * otherwise the group with the most cards.
+ */
+export function getBestGroupForColor(
+  player: PlayerState,
+  color: PropertyColor
+): PropertyGroup | undefined {
+  const groups = player.properties.filter(
+    (g) => g.color === color && g.cards.length > 0
+  );
+  if (groups.length === 0) return undefined;
+  if (groups.length === 1) return groups[0];
+  // Pick the group with the highest calculated rent
+  return groups.reduce((best, g) =>
+    calculateRent(g) > calculateRent(best) ? g : best
+  );
 }
 
 // ---- Rent Calculation ----

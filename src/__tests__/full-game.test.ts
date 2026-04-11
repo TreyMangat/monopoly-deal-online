@@ -750,3 +750,290 @@ describe("Win-Path Regression Tests", () => {
     expect(s.winnerId).toBe("p1");
   });
 });
+
+// ---- Multi-Group Property Tests (Same Color Overflow) ----
+
+describe("Multi-Group Properties (Same Color Overflow)", () => {
+
+  /** Helper: create a game where P1 has a complete Green set and a Green card in hand */
+  function createOverflowGame(): GameState {
+    return {
+      roomCode: "OVERFLOW",
+      deck: [money("dk1", 1), money("dk2", 2), money("dk3", 1), money("dk4", 2), money("dk5", 1)],
+      discardPile: [],
+      players: [
+        {
+          id: "p1", name: "Alice", avatar: 0,
+          hand: [
+            prop("pacific", PropertyColor.Green, "Pacific Avenue", 4),
+            money("m1_p1", 1),
+          ],
+          bank: [money("m5_p1", 5)],
+          properties: [
+            { color: PropertyColor.Green, cards: [
+              prop("northcar", PropertyColor.Green, "North Carolina Avenue", 4),
+              prop("pennave", PropertyColor.Green, "Pennsylvania Avenue", 4),
+              prop("pacific2", PropertyColor.Green, "Pacific Avenue (2)", 4),
+            ], hasHouse: false, hasHotel: false },
+            { color: PropertyColor.Brown, cards: [
+              prop("med", PropertyColor.Brown, "Mediterranean Avenue", 1),
+              prop("baltic", PropertyColor.Brown, "Baltic Avenue", 1),
+            ], hasHouse: false, hasHotel: false },
+          ],
+          connected: true,
+        },
+        {
+          id: "p2", name: "Bob", avatar: 1,
+          hand: [money("m1_p2", 1), money("m2_p2", 2)],
+          bank: [money("m5_p2", 5)],
+          properties: [
+            { color: PropertyColor.Red, cards: [
+              prop("indiana", PropertyColor.Red, "Indiana Avenue", 3),
+              prop("illinois", PropertyColor.Red, "Illinois Avenue", 3),
+            ], hasHouse: false, hasHotel: false },
+          ],
+          connected: true,
+        },
+      ],
+      currentPlayerIndex: 0,
+      actionsRemaining: 3,
+      phase: TurnPhase.Play,
+      pendingAction: null,
+      turnNumber: 5,
+      winnerId: null,
+      useDoubleDeck: false,
+      doubleRentActive: false,
+    };
+  }
+
+  it("4th property of same color creates new incomplete set, not 4/3", () => {
+    let s = createOverflowGame();
+    // Green is 3/3 complete. Playing a 4th Green card should start a new set.
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "pacific", destinationColor: PropertyColor.Green,
+    }));
+
+    const greenGroups = s.players[0].properties.filter(g => g.color === PropertyColor.Green);
+    expect(greenGroups.length).toBe(2); // Two Green groups
+    expect(greenGroups[0].cards.length).toBe(3); // Original complete set
+    expect(greenGroups[1].cards.length).toBe(1); // New incomplete set
+  });
+
+  it("rent uses the best (complete) set, not the incomplete one", () => {
+    let s = createOverflowGame();
+    // First play the overflow card to create 3/3 + 1/3
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "pacific", destinationColor: PropertyColor.Green,
+    }));
+    // Now add a rent card and charge rent
+    s.players[0].hand.push({
+      id: "rent_gb", type: CardType.RentTwoColor, name: "Rent: Green/DarkBlue", bankValue: 1,
+      rentColors: [PropertyColor.Green, PropertyColor.DarkBlue] as [PropertyColor, PropertyColor],
+    });
+    s = ok(applyAction(s, {
+      type: ActionType.PlayRentCard, playerId: "p1",
+      cardId: "rent_gb", targetColor: PropertyColor.Green,
+    }));
+    // Green complete set (3 cards) = $7M rent
+    expect(s.pendingAction!.amount).toBe(7);
+  });
+
+  it("house placed on complete set, not incomplete one", () => {
+    let s = createOverflowGame();
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "pacific", destinationColor: PropertyColor.Green,
+    }));
+    // Add a house card
+    s.players[0].hand.push({
+      id: "house1", type: CardType.ActionHouse, name: "House", bankValue: 3,
+    });
+    s = ok(applyAction(s, {
+      type: ActionType.PlayHouse, playerId: "p1",
+      cardId: "house1", targetColor: PropertyColor.Green,
+    }));
+    // House goes on the complete set
+    const greenGroups = s.players[0].properties.filter(g => g.color === PropertyColor.Green);
+    const completeGreen = greenGroups.find(g => g.cards.length >= 3);
+    expect(completeGreen!.hasHouse).toBe(true);
+    const incompleteGreen = greenGroups.find(g => g.cards.length < 3);
+    expect(incompleteGreen!.hasHouse).toBe(false);
+  });
+
+  it("Sly Deal can target property in incomplete set even when complete set exists", () => {
+    let s = createOverflowGame();
+    // Create 3/3 + 1/3 Green for P1
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "pacific", destinationColor: PropertyColor.Green,
+    }));
+    // Switch to P2's turn
+    s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
+    s = ok(applyAction(s, { type: ActionType.DrawCards, playerId: "p2" }));
+    // P2 plays Sly Deal targeting the card in P1's INCOMPLETE Green set
+    s.players[1].hand.push({
+      id: "sly1", type: CardType.ActionSlyDeal, name: "Sly Deal", bankValue: 3,
+    });
+    s = ok(applyAction(s, {
+      type: ActionType.PlaySlyDeal, playerId: "p2",
+      cardId: "sly1", targetPlayerId: "p1", targetCardId: "pacific",
+    }));
+    expect(s.phase).toBe(TurnPhase.AwaitingResponse);
+    // P1 accepts
+    s = ok(applyAction(s, { type: ActionType.AcceptAction, playerId: "p1" }));
+    // Pacific should be stolen from P1 and added to P2's properties
+    const p1Greens = s.players[0].properties.filter(g => g.color === PropertyColor.Green);
+    expect(p1Greens.length).toBe(1); // Only the complete set remains (empty group removed)
+    expect(p1Greens[0].cards.length).toBe(3);
+    // P2 now has a Green group
+    const p2Green = s.players[1].properties.find(g => g.color === PropertyColor.Green);
+    expect(p2Green).toBeDefined();
+    expect(p2Green!.cards[0].id).toBe("pacific");
+  });
+
+  it("Deal Breaker targets complete set, not incomplete one", () => {
+    let s = createOverflowGame();
+    // Create 3/3 + 1/3 Green for P1
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "pacific", destinationColor: PropertyColor.Green,
+    }));
+    // Switch to P2's turn
+    s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
+    s = ok(applyAction(s, { type: ActionType.DrawCards, playerId: "p2" }));
+    s.players[1].hand.push({
+      id: "db1", type: CardType.ActionDealBreaker, name: "Deal Breaker", bankValue: 5,
+    });
+    s = ok(applyAction(s, {
+      type: ActionType.PlayDealBreaker, playerId: "p2",
+      cardId: "db1", targetPlayerId: "p1", targetColor: PropertyColor.Green,
+    }));
+    s = ok(applyAction(s, { type: ActionType.AcceptAction, playerId: "p1" }));
+    // P2 stole the complete 3/3 set
+    const p2Greens = s.players[1].properties.filter(g => g.color === PropertyColor.Green);
+    expect(p2Greens.length).toBe(1);
+    expect(p2Greens[0].cards.length).toBe(3);
+    // P1 still has the incomplete 1/3 set
+    const p1Greens = s.players[0].properties.filter(g => g.color === PropertyColor.Green);
+    expect(p1Greens.length).toBe(1);
+    expect(p1Greens[0].cards.length).toBe(1);
+  });
+
+  it("wild card on completed color creates new incomplete set", () => {
+    let s = createOverflowGame();
+    // Replace hand card with a rainbow wild
+    s.players[0].hand[0] = { id: "wild_rainbow", type: CardType.PropertyWildAll, name: "Wild Property", bankValue: 0 };
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "wild_rainbow", destinationColor: PropertyColor.Green,
+    }));
+    const greenGroups = s.players[0].properties.filter(g => g.color === PropertyColor.Green);
+    expect(greenGroups.length).toBe(2);
+    expect(greenGroups[1].cards.length).toBe(1);
+    expect(greenGroups[1].cards[0].id).toBe("wild_rainbow");
+  });
+
+  it("win condition: 2x complete Green + complete Red + complete Blue = WIN (3 unique colors)", () => {
+    let s = createOverflowGame();
+    // Give P1 enough sets: Green(3/3), Brown(2/2), add DarkBlue(2/2) and a 2nd Green(3/3)
+    s.players[0].properties.push(
+      { color: PropertyColor.DarkBlue, cards: [
+        prop("boardwalk", PropertyColor.DarkBlue, "Boardwalk", 4),
+        prop("park", PropertyColor.DarkBlue, "Park Place", 4),
+      ], hasHouse: false, hasHotel: false },
+      { color: PropertyColor.Green, cards: [
+        prop("g4", PropertyColor.Green, "G4", 4),
+        prop("g5", PropertyColor.Green, "G5", 4),
+        prop("g6", PropertyColor.Green, "G6", 4),
+      ], hasHouse: false, hasHotel: false },
+    );
+    // P1 has Green(3/3), Brown(2/2), DarkBlue(2/2), Green(3/3) = 3 unique colors = WIN
+    s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win condition: 2x complete Green + complete Brown = NOT a win (only 2 unique colors)", () => {
+    let s = createOverflowGame();
+    // P1 has Green(3/3) + Brown(2/2) + add a 2nd Green(3/3). That's only 2 unique colors.
+    s.players[0].properties.push(
+      { color: PropertyColor.Green, cards: [
+        prop("g4", PropertyColor.Green, "G4", 4),
+        prop("g5", PropertyColor.Green, "G5", 4),
+        prop("g6", PropertyColor.Green, "G6", 4),
+      ], hasHouse: false, hasHotel: false },
+    );
+    s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
+    // 2 unique colors (Green, Brown) — NOT a win
+    expect(s.phase).not.toBe(TurnPhase.GameOver);
+  });
+
+  it("payment with property that completes collector's existing color creates new group", () => {
+    let s = createOverflowGame();
+    // P1 charges debt, P2 pays with a Red property
+    s.players[0].hand.push({
+      id: "dc1", type: CardType.ActionDebtCollector,
+      name: "Debt Collector", bankValue: 3, actionValue: 5,
+    });
+    // Give P1 a complete Red set so received Red goes to new group
+    s.players[0].properties.push({
+      color: PropertyColor.Red, cards: [
+        prop("red1", PropertyColor.Red, "Kentucky Avenue", 3),
+        prop("red2", PropertyColor.Red, "Indiana Avenue", 3),
+        prop("red3", PropertyColor.Red, "Illinois Avenue", 3),
+      ], hasHouse: false, hasHotel: false,
+    });
+    s.players[1].bank = []; // Force P2 to pay with properties
+    s = ok(applyAction(s, {
+      type: ActionType.PlayDebtCollector, playerId: "p1",
+      cardId: "dc1", targetPlayerId: "p2",
+    }));
+    // P2 pays with their Red properties
+    s = ok(applyAction(s, {
+      type: ActionType.PayWithCards, playerId: "p2",
+      cardIds: ["indiana", "illinois"],
+    }));
+    // P1 should have 3/3 Red + 2/3 Red (not 5/3 Red)
+    const p1Reds = s.players[0].properties.filter(g => g.color === PropertyColor.Red);
+    expect(p1Reds.length).toBe(2);
+    expect(p1Reds[0].cards.length).toBe(3); // Original complete
+    expect(p1Reds[1].cards.length).toBe(2); // New from payment
+  });
+
+  it("2-card set (Brown): 3rd card of same color overflows", () => {
+    let s = createOverflowGame();
+    // P1 has Brown(2/2) complete. Add a 3rd brown to hand.
+    s.players[0].hand.push(prop("extra_brown", PropertyColor.Brown, "Extra Brown", 1));
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "extra_brown", destinationColor: PropertyColor.Brown,
+    }));
+    const brownGroups = s.players[0].properties.filter(g => g.color === PropertyColor.Brown);
+    expect(brownGroups.length).toBe(2);
+    expect(brownGroups[0].cards.length).toBe(2); // Original complete
+    expect(brownGroups[1].cards.length).toBe(1); // Overflow
+  });
+
+  it("4-card set (Railroad): 5th card overflows", () => {
+    let s = createOverflowGame();
+    s.players[0].properties.push({
+      color: PropertyColor.Railroad, cards: [
+        prop("rr1", PropertyColor.Railroad, "Short Line", 2),
+        prop("rr2", PropertyColor.Railroad, "B&O Railroad", 2),
+        prop("rr3", PropertyColor.Railroad, "Pennsylvania Railroad", 2),
+        prop("rr4", PropertyColor.Railroad, "Reading Railroad", 2),
+      ], hasHouse: false, hasHotel: false,
+    });
+    s.players[0].hand.push(prop("rr5", PropertyColor.Railroad, "Extra Railroad", 2));
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "rr5", destinationColor: PropertyColor.Railroad,
+    }));
+    const rrGroups = s.players[0].properties.filter(g => g.color === PropertyColor.Railroad);
+    expect(rrGroups.length).toBe(2);
+    expect(rrGroups[0].cards.length).toBe(4);
+    expect(rrGroups[1].cards.length).toBe(1);
+  });
+});

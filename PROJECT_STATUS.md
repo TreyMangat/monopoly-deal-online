@@ -28,8 +28,8 @@
 | Web client (HTML/CSS/JS) | 3,973 LOC (1 file) |
 | Swift (iOS client) | 5,939 LOC (31 files) |
 | **Total code** | **~19,800 LOC** |
-| Tests passing | 133 (5 test files) |
-| Test breakdown | 44 bot + 33 engine + 19 full-game + 17 server + 20 vote |
+| Tests passing | 144 (5 test files) |
+| Test breakdown | 44 bot + 33 engine + 30 full-game + 17 server + 20 vote |
 
 ---
 
@@ -182,6 +182,17 @@ Config:
 - [x] 7 new bot tests (payment optimization, medium banking behavior)
 
 ---
+
+### Bug Fix: Multi-Group Property Overflow ✅
+- [x] Properties played on a completed set now start a new incomplete set instead of merging (e.g. 3/3 Green + 1 card → 3/3 + 1/3, not 4/3)
+- [x] Rent calculation uses best group of a color (complete set with house/hotel bonuses)
+- [x] House/Hotel placement targets complete sets only
+- [x] Deal Breaker steals complete set specifically, leaves incomplete
+- [x] Sly Deal can target cards in incomplete sets even when complete set of same color exists
+- [x] Win condition unchanged: 3 complete sets of DIFFERENT colors (deduplicates by color)
+- [x] Bot AI updated: all `.find()` property lookups now multi-group aware
+- [x] Client updated: color lists deduplicated, rent display uses best group, Deal Breaker modal targets complete sets
+- [x] 11 regression tests covering overflow, rent, house, Deal Breaker, Sly Deal, wild cards, win condition, payment, multi-size sets
 
 ## Current Sprint: Polish & Bug Fixes
 
