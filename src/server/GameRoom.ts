@@ -33,7 +33,7 @@ import {
   TIMER_UPDATE_INTERVAL_MS,
 } from "../shared/constants";
 import { initializeGame, applyAction } from "../engine/GameEngine";
-import { shuffle } from "../engine/helpers";
+import { shuffle, calculateMinimumPayment } from "../engine/helpers";
 import { serverMsg } from "../shared/protocol";
 import { BotManager, type BotDifficulty } from "../engine/BotManager";
 
@@ -891,22 +891,13 @@ export class GameRoom {
   }
 
   private getAutoPayCardIds(playerId: string): string[] {
-    if (!this.gameState) return [];
+    if (!this.gameState || !this.gameState.pendingAction) return [];
     const player = this.gameState.players.find((p) => p.id === playerId);
     if (!player) return [];
 
-    const ids: string[] = [];
-    // Bank cards first
-    for (const card of player.bank) {
-      ids.push(card.id);
-    }
-    // Then property cards
-    for (const group of player.properties) {
-      for (const card of group.cards) {
-        ids.push(card.id);
-      }
-    }
-    return ids;
+    const amount = this.gameState.pendingAction.amount || 0;
+    // Use minimum-overpayment algorithm — never take more than needed
+    return calculateMinimumPayment(player, amount);
   }
 
   // ---- Vote System ----
@@ -1235,7 +1226,7 @@ export class GameRoom {
     }
   }
 
-  private sendStateToPlayer(playerId: string): void {
+  sendStateToPlayer(playerId: string): void {
     const player = this.players.find((p) => p.id === playerId);
     if (!player?.ws || player.ws.readyState !== WebSocket.OPEN) return;
 
@@ -1291,6 +1282,7 @@ export class GameRoom {
       opponents,
       pendingAction: gs.pendingAction,
       winnerId: gs.winnerId,
+      stateVersion: gs.stateVersion || 0,
     };
   }
 

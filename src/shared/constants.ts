@@ -56,7 +56,7 @@ export const MAX_PLAYERS = 6;
 export const DOUBLE_DECK_THRESHOLD = 6; // use double deck at this player count
 export const ROOM_CODE_LENGTH = 6;
 export const ROOM_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
-export const RECONNECT_GRACE_MS = 120 * 1000; // 2 minutes to reconnect
+export const RECONNECT_GRACE_MS = 180 * 1000; // 3 minutes to reconnect (matches client 5min window)
 export const PING_INTERVAL_MS = 25 * 1000; // 25s — under Render's ~30s proxy timeout
 
 // Turn timers

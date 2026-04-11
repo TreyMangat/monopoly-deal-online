@@ -1107,6 +1107,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
     </div>
   </div>
   <button id="settingsBtn" onclick="toggleSettings()">&#9881;</button>
+  <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.35);margin-top:12px;line-height:1.4">Hosted on free tier — brief disconnects may occur but games auto-resume</div>
 </div>
 
 <!-- Settings Modal -->
@@ -1756,8 +1757,10 @@ function clearSession() {
   try { sessionStorage.removeItem('md_session'); } catch(e) {}
 }
 
-// ---- Reconnect backoff schedule (ms): 500, 1000, 2000, 4000, 8000, 15000, 30000, then 30s repeating ----
-const BACKOFF_SCHEDULE = [500, 1000, 2000, 4000, 8000, 15000, 30000];
+// ---- Reconnect backoff schedule (ms): immediate, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000 ----
+// First 3 attempts cover <2s — most Render disconnects invisible to user
+const BACKOFF_SCHEDULE = [0, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000];
+const FAST_RECONNECT_THRESHOLD = 3; // Don't show overlay until this many attempts fail
 const MAX_RECONNECT_TIME_MS = 5 * 60 * 1000; // 5 minutes total before giving up
 let reconnectStartTime = 0;
 let reconnectCountdownTimer = null;
@@ -1767,6 +1770,7 @@ function connect(isReconnect) {
   const url = getWsUrl();
   ws = new WebSocket(url);
   ws.onopen = () => {
+    const wasFastRecovery = isReconnect && reconnectAttempts <= FAST_RECONNECT_THRESHOLD;
     reconnectAttempts = 0;
     reconnectStartTime = 0;
     lastMessageTime = Date.now();
@@ -1776,6 +1780,8 @@ function connect(isReconnect) {
     connEl.onclick = null;
     if (reconnectCountdownTimer) { clearInterval(reconnectCountdownTimer); reconnectCountdownTimer = null; }
     startHeartbeat();
+    // Subtle toast for fast recovery — user barely noticed
+    if (wasFastRecovery && gameState) toast('Reconnected');
     // If reconnecting with existing session, send reconnect message
     if (isReconnect && myPlayerId && mySessionToken && roomCode) {
       send('reconnect', { roomCode, playerId: myPlayerId, sessionToken: mySessionToken });
@@ -1811,30 +1817,36 @@ function scheduleReconnect() {
     return;
   }
 
-  const connEl = document.getElementById('connStatus');
-  connEl.classList.add('active');
-  connEl.style.cursor = '';
-  connEl.onclick = null;
-
   const delay = reconnectAttempts < BACKOFF_SCHEDULE.length
     ? BACKOFF_SCHEDULE[reconnectAttempts]
     : 30000;
   reconnectAttempts++;
 
-  // Show countdown
-  let remaining = Math.ceil(delay / 1000);
-  connEl.textContent = `Reconnecting in ${remaining}s...`;
-  if (reconnectCountdownTimer) clearInterval(reconnectCountdownTimer);
-  reconnectCountdownTimer = setInterval(() => {
-    remaining--;
-    if (remaining > 0) {
+  // Suppress overlay for the first few fast attempts (invisible recovery)
+  if (reconnectAttempts > FAST_RECONNECT_THRESHOLD) {
+    const connEl = document.getElementById('connStatus');
+    connEl.classList.add('active');
+    connEl.style.cursor = '';
+    connEl.onclick = null;
+    // Show countdown for longer delays
+    if (delay >= 1000) {
+      let remaining = Math.ceil(delay / 1000);
       connEl.textContent = `Reconnecting in ${remaining}s...`;
+      if (reconnectCountdownTimer) clearInterval(reconnectCountdownTimer);
+      reconnectCountdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining > 0) {
+          connEl.textContent = `Reconnecting in ${remaining}s...`;
+        } else {
+          connEl.textContent = 'Reconnecting...';
+          clearInterval(reconnectCountdownTimer);
+          reconnectCountdownTimer = null;
+        }
+      }, 1000);
     } else {
       connEl.textContent = 'Reconnecting...';
-      clearInterval(reconnectCountdownTimer);
-      reconnectCountdownTimer = null;
     }
-  }, 1000);
+  }
 
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -1925,6 +1937,25 @@ function send(type, payload) {
   ws.send(JSON.stringify({ type, payload }));
 }
 
+function requestResync() {
+  if (roomCode) {
+    send('resync', { roomCode });
+    toast('Resyncing...');
+  }
+}
+
+// Debug: triple-tap game title to force resync
+let resyncTapCount = 0;
+let resyncTapTimer = null;
+document.addEventListener('click', (e) => {
+  if (e.target && (e.target.closest('.title-logo') || e.target.closest('.game-header'))) {
+    resyncTapCount++;
+    if (resyncTapTimer) clearTimeout(resyncTapTimer);
+    resyncTapTimer = setTimeout(() => { resyncTapCount = 0; }, 600);
+    if (resyncTapCount >= 3) { resyncTapCount = 0; requestResync(); }
+  }
+});
+
 // ============================================================
 // HAPTIC FEEDBACK
 // ============================================================
@@ -1965,10 +1996,16 @@ function handleMessage(msg) {
       break;
     case 'game_started':
     case 'game_state_update': {
+      const incoming = msg.payload.state;
+      // Ignore out-of-order state updates
+      if (gameState && incoming.stateVersion != null && gameState.stateVersion != null
+          && incoming.stateVersion < gameState.stateVersion) {
+        break;
+      }
       const prevHand = gameState ? new Set(gameState.you.hand.map(c => c.id)) : new Set();
       const prevBank = gameState ? gameState.you.bank.map(c => c.id) : [];
       const prevPending = gameState ? gameState.pendingAction : null;
-      gameState = msg.payload.state;
+      gameState = incoming;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
         const desc = msg.payload.lastAction.description;
         const isBotAct = msg.payload.lastAction.isBotAction;
@@ -2032,6 +2069,10 @@ function handleMessage(msg) {
       break;
     case 'chat_message':
       addChatMessage(msg.payload);
+      break;
+    case 'heartbeat':
+      // Echo heartbeat back to server — keeps app-layer traffic flowing
+      try { ws.send(JSON.stringify({ type: 'heartbeat', payload: {} })); } catch(e) {}
       break;
     case 'error':
       // Handle unrecoverable reconnect errors — stop retrying

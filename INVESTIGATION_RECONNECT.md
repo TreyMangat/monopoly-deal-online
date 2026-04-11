@@ -99,3 +99,22 @@ Client doesn't pause reconnect attempts when device is offline (airplane mode, s
 - **Cold starts** after 15min idle take ~30s. REJOIN must handle this via client retry backoff.
 - **Recommendation**: If disconnects persist after these fixes, upgrade to Render Starter ($7/mo) — eliminates cold starts and has more stable WebSocket infrastructure.
 - **Alternatives to free tier**: Fly.io free tier or a $5 DigitalOcean droplet — neither has the same WebSocket idle kill behavior.
+
+---
+
+## Permanent Fix (Hosting Decision for Trey)
+
+The Render free tier WebSocket disconnects are an **infrastructure issue**, not an application issue. No amount of pinging, heartbeating, or reconnect logic fully prevents them. Multiple Render community reports (2024-2025) confirm this. Our defense-in-depth strategy (Sprint 11 + Sprint 12) makes disconnects invisible in most cases by reconnecting in <2 seconds, but the underlying cause persists.
+
+### Options to eliminate disconnects entirely:
+
+| Option | Cost | Pros | Cons |
+|--------|------|------|------|
+| **Render Starter** | $7/mo | Same deploy workflow, no code changes, no cold starts, stable WS | Monthly cost |
+| **Fly.io free tier** | $0 | Free, no WS idle kills, global edge | Different deploy config, smaller free tier limits |
+| **Railway** | ~$5/mo | Easy deploy, stable WS, good DX | Monthly cost |
+| **DigitalOcean Droplet** | $4/mo | Full control, stable, no proxy issues | Must manage server yourself |
+| **Self-hosted (home)** | $0 | Free, full control | Requires port forwarding, static IP, uptime risk |
+
+### Recommendation
+For a family/friends game, **Fly.io free tier** is the best zero-cost option. For reliability without hassle, **Render Starter at $7/mo** is the simplest upgrade — zero code changes, just change the plan in the dashboard.

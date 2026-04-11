@@ -192,6 +192,10 @@ const pingInterval = setInterval(() => {
     }
     missedPongs.set(ws, missed);
     ws.ping();
+    // Application-level heartbeat — produces actual JSON traffic that traverses HTTP proxies
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.send(serverMsg(ServerMessageType.Heartbeat, { ts: Date.now() })); } catch {}
+    }
   });
 }, PING_INTERVAL_MS);
 
@@ -530,6 +534,25 @@ function handleClientMessage(
 
     case ClientMessageType.Pong: {
       // Client responding to our ping — handled by ws 'pong' event
+      break;
+    }
+
+    case ClientMessageType.Heartbeat: {
+      // Echo heartbeat back — keeps app-layer traffic flowing through proxies
+      ws.send(serverMsg(ServerMessageType.Heartbeat, { ts: Date.now() }));
+      break;
+    }
+
+    case ClientMessageType.Resync: {
+      // Client requests full state resync
+      const { roomCode: resyncRoomCode } = payload || {};
+      const resyncRoom = resyncRoomCode ? roomManager.getRoom(resyncRoomCode) : undefined;
+      if (resyncRoom) {
+        const resyncPlayer = resyncRoom.players.find((p) => p.ws === ws);
+        if (resyncPlayer && resyncRoom.gameState) {
+          resyncRoom.sendStateToPlayer(resyncPlayer.id);
+        }
+      }
       break;
     }
 
