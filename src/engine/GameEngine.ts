@@ -100,6 +100,7 @@ export function initializeGame(
     winnerId: null,
     useDoubleDeck,
     doubleRentActive: false,
+    stateVersion: 0,
   };
 
   // Player must draw cards to start their turn
@@ -130,6 +131,7 @@ export function applyAction(
 ): EngineResult {
   // Deep clone state so we don't mutate the original
   state = JSON.parse(JSON.stringify(state));
+  state.stateVersion = (state.stateVersion || 0) + 1;
 
   const player = getPlayer(state, action.playerId);
   if (!player) return { ok: false, error: "Player not found" };
