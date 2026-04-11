@@ -28,8 +28,8 @@
 | Web client (HTML/CSS/JS) | 3,973 LOC (1 file) |
 | Swift (iOS client) | 5,939 LOC (31 files) |
 | **Total code** | **~19,800 LOC** |
-| Tests passing | 144 (5 test files) |
-| Test breakdown | 44 bot + 33 engine + 30 full-game + 17 server + 20 vote |
+| Tests passing | 150 (5 test files) |
+| Test breakdown | 44 bot + 33 engine + 30 full-game + 23 server + 20 vote |
 
 ---
 
@@ -193,6 +193,18 @@ Config:
 - [x] Bot AI updated: all `.find()` property lookups now multi-group aware
 - [x] Client updated: color lists deduplicated, rent display uses best group, Deal Breaker modal targets complete sets
 - [x] 11 regression tests covering overflow, rent, house, Deal Breaker, Sly Deal, wild cards, win condition, payment, multi-size sets
+
+### Sprint 11: Connection Resilience ✅
+- [x] Server heartbeat changed from 15s/1-miss to 25s/2-miss (50s tolerance) — keeps Render proxy alive
+- [x] Client reconnect hardened: exponential backoff (500ms→30s), up to 5 minutes total, with countdown display
+- [x] Session persistence to sessionStorage — survives page refresh and PWA restart
+- [x] Auto-reconnect on page load if session exists
+- [x] Online/offline event listeners — pauses retries when offline, resumes immediately on network return
+- [x] Specific server error codes: ROOM_EXPIRED, PLAYER_NOT_IN_ROOM, INVALID_SESSION — client stops retrying on unrecoverable errors
+- [x] Disconnect broadcast includes grace period duration for client countdown
+- [x] Turn timer confirmed paused during disconnected player's grace period
+- [x] 6 reconnect regression tests (turn pause, valid rejoin, invalid session, nonexistent room, rapid cycles, grace period)
+- Full analysis: `INVESTIGATION_RECONNECT.md`
 
 ## Current Sprint: Polish & Bug Fixes
 
