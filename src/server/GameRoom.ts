@@ -1178,6 +1178,10 @@ export class GameRoom {
         gs.discardPile.length > 0
           ? gs.discardPile[gs.discardPile.length - 1]
           : null,
+      discardPileSecond:
+        gs.discardPile.length > 1
+          ? gs.discardPile[gs.discardPile.length - 2]
+          : null,
       you,
       opponents,
       pendingAction: gs.pendingAction,

@@ -230,8 +230,12 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .opp-card .opp-stats{display:flex;gap:12px;margin-bottom:6px}
 .opp-card .opp-hand{color:var(--muted);font-size:12px}
 .opp-card .opp-bank{color:var(--success);font-size:14px;font-weight:700}
-.opp-props{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.opp-prop-stack{display:flex;flex-wrap:wrap;align-items:center;position:relative;min-height:32px}
+.opp-props{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:6px}
+.opp-prop-stack{display:flex;flex-direction:column;align-items:flex-start;position:relative;gap:2px}
+.opp-prop-color-label{font-size:10px;font-weight:800;letter-spacing:.5px;display:block;
+  line-height:1;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5);
+  font-variant:small-caps}
+.opp-prop-row{display:flex;align-items:center}
 .opp-prop-mini{width:22px;height:32px;border-radius:3px;border:1px solid rgba(255,255,255,.25);
   font-size:7px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;
   margin-left:-6px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.4);
@@ -239,10 +243,8 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .opp-prop-mini:first-child{margin-left:0}
 .opp-prop-mini .opm-name{font-size:5px;text-align:center;line-height:1;word-break:break-all;
   overflow:hidden;max-height:28px;padding:1px}
-.opp-prop-stack.complete{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+.opp-prop-stack.complete{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px;padding:2px}
 .opp-prop-label{font-size:10px;color:var(--muted);margin-left:5px;display:flex;align-items:center;font-weight:600}
-.opp-prop-color-label{font-size:8px;font-weight:800;letter-spacing:.5px;display:block;
-  margin-bottom:2px;margin-left:0;text-shadow:0 1px 2px rgba(0,0,0,.5)}
 .opp-wild-badge{font-size:7px;position:absolute;top:0;right:0;line-height:1}
 
 /* ---- Opponent Overlay ---- */
@@ -306,11 +308,15 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 /* Discard Pile */
 .discard-pile{display:flex;flex-direction:column;align-items:center;gap:6px}
+.discard-stack{position:relative;width:72px;height:100px}
 .discard-card{width:64px;height:90px;border-radius:8px;border:2px dashed rgba(255,255,255,.1);
   display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);
-  background:rgba(0,0,0,.15);transform:rotate(2deg);transition:all .3s}
+  background:rgba(0,0,0,.15);transform:rotate(2deg);transition:all .3s;position:absolute;top:0;left:0}
 .discard-card.has-card{border:2px solid rgba(255,255,255,.15);background:var(--cream);color:#333;
-  box-shadow:0 3px 10px rgba(0,0,0,.4);transform:rotate(-2deg)}
+  box-shadow:0 3px 10px rgba(0,0,0,.4)}
+.discard-card-bottom{z-index:0;top:8px;left:4px;transform:rotate(-1deg)}
+.discard-card-top{z-index:1;top:0;left:0;transform:rotate(2.5deg)}
+.discard-card-top.has-card{transform:rotate(-2.5deg)}
 .discard-card .dc-name{font-size:9px;font-weight:600;text-align:center;padding:4px;word-break:break-word}
 .discard-card .dc-value{font-size:8px;opacity:.7}
 .discard-card .dc-color-bar{position:absolute;top:0;left:0;right:0;height:14px;border-radius:4px 4px 0 0}
@@ -961,6 +967,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   .table-center{gap:16px;padding:12px 8px}
   .draw-pile-stack,.card-back{width:54px;height:76px}
   .discard-card{width:54px;height:76px}
+  .discard-stack{width:62px;height:88px}
 }
 </style>
 </head>
@@ -1078,7 +1085,10 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
         <div class="pile-label" id="drawPileLabel">Draw (0)</div>
       </div>
       <div class="discard-pile" id="discardPile">
-        <div class="discard-card" id="discardCard">Empty</div>
+        <div class="discard-stack">
+          <div class="discard-card discard-card-bottom" id="discardCardBottom"></div>
+          <div class="discard-card discard-card-top" id="discardCard">Empty</div>
+        </div>
         <div class="pile-label">Discard</div>
       </div>
     </div>
@@ -1522,6 +1532,11 @@ const COLOR_HEX = {
   brown:'#8B4513',light_blue:'#87CEEB',pink:'#E75480',orange:'#FF8C00',
   red:'#DC143C',yellow:'#FFD700',green:'#228B22',dark_blue:'#00008B',
   railroad:'#2C2C2C',utility:'#A9A9A9'
+};
+const COLOR_HEX_BRIGHT = {
+  brown:'#C4722A',light_blue:'#A8DFFA',pink:'#FF7BAA',orange:'#FFA940',
+  red:'#FF4D6A',yellow:'#FFE44D',green:'#3ECF3E',dark_blue:'#4D6FFF',
+  railroad:'#888',utility:'#CCC'
 };
 const COLOR_LABELS = {
   brown:'Brown',light_blue:'Light Blue',pink:'Pink',orange:'Orange',
@@ -2027,20 +2042,31 @@ function renderTableCenter() {
     b.style.display = gs.drawPileCount > i ? '' : 'none';
   });
 
-  // Discard pile
-  const discardEl = document.getElementById('discardCard');
+  // Discard pile — stacked top 2 cards
+  const discardTop = document.getElementById('discardCard');
+  const discardBottom = document.getElementById('discardCardBottom');
   if (gs.discardPileTop) {
-    discardEl.classList.add('has-card');
+    discardTop.classList.add('has-card');
     const bg = getDiscardBackground(gs.discardPileTop);
     const txt = getDiscardTextColor(gs.discardPileTop);
-    discardEl.style.background = bg;
-    discardEl.style.color = txt;
-    discardEl.innerHTML = `<div class="dc-name">${esc(gs.discardPileTop.name)}</div><div class="dc-value">$${gs.discardPileTop.bankValue}M</div>`;
+    discardTop.style.background = bg;
+    discardTop.style.color = txt;
+    discardTop.innerHTML = `<div class="dc-name">${esc(gs.discardPileTop.name)}</div><div class="dc-value">$${gs.discardPileTop.bankValue}M</div>`;
   } else {
-    discardEl.classList.remove('has-card');
-    discardEl.style.background = '';
-    discardEl.style.color = '';
-    discardEl.innerHTML = 'Empty';
+    discardTop.classList.remove('has-card');
+    discardTop.style.background = '';
+    discardTop.style.color = '';
+    discardTop.innerHTML = 'Empty';
+  }
+  if (gs.discardPileSecond) {
+    discardBottom.classList.add('has-card');
+    discardBottom.style.background = getDiscardBackground(gs.discardPileSecond);
+    discardBottom.style.color = getDiscardTextColor(gs.discardPileSecond);
+    discardBottom.innerHTML = `<div class="dc-name">${esc(gs.discardPileSecond.name)}</div><div class="dc-value">$${gs.discardPileSecond.bankValue}M</div>`;
+    discardBottom.style.display = '';
+  } else {
+    discardBottom.classList.remove('has-card');
+    discardBottom.style.display = 'none';
   }
 }
 
@@ -2107,10 +2133,12 @@ function renderOpponents() {
       opp.properties.forEach(g => {
         const complete = g.cards.length >= (SET_SIZES[g.color] || 3);
         const bgColor = COLOR_HEX[g.color] || '#666';
+        const brightColor = COLOR_HEX_BRIGHT[g.color] || bgColor;
         const txtColor = isLightColor(g.color) ? '#222' : '#fff';
         const colorName = (COLOR_LABELS[g.color] || g.color).toUpperCase();
         propsHtml += `<div class="opp-prop-stack${complete ? ' complete' : ''}">`;
-        propsHtml += `<span class="opp-prop-color-label" style="color:${bgColor}">${colorName}</span>`;
+        propsHtml += `<span class="opp-prop-color-label" style="color:${brightColor}">${colorName}</span>`;
+        propsHtml += '<div class="opp-prop-row">';
         g.cards.forEach((c, ci) => {
           const isWild = c.type === 'property_wild';
           const isWildAll = c.type === 'property_wild_all';
@@ -2128,7 +2156,7 @@ function renderOpponents() {
           const abbr = getCardAbbr(c);
           propsHtml += `<div class="opp-prop-mini" style="${cardBg};z-index:${ci};color:${txtColor}" title="${esc(c.name)}"><span class="opm-name">${esc(abbr)}</span>${wildBadge}</div>`;
         });
-        propsHtml += `<span class="opp-prop-label">${g.cards.length}/${SET_SIZES[g.color] || '?'}</span></div>`;
+        propsHtml += `<span class="opp-prop-label">${g.cards.length}/${SET_SIZES[g.color] || '?'}</span></div></div>`;
       });
       if (opp.properties.some(g => g.hasHouse)) propsHtml += ' <span style="font-size:14px" title="House">&#127968;</span>';
       if (opp.properties.some(g => g.hasHotel)) propsHtml += ' <span style="font-size:14px" title="Hotel">&#127960;</span>';

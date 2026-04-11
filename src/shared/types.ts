@@ -229,6 +229,7 @@ export interface ClientGameState {
   turnNumber: number;
   drawPileCount: number;
   discardPileTop: Card | null;
+  discardPileSecond: Card | null; // second-to-top card for stacked display
   you: PlayerState; // full hand visible
   opponents: OpponentView[]; // hands hidden
   pendingAction: PendingAction | null;
