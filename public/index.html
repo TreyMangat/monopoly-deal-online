@@ -606,6 +606,10 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   -webkit-user-select:none;user-select:none;touch-action:manipulation}
 #pickerModal .pick-item:active{background:rgba(255,255,255,.08)}
 #pickerModal .pick-item.disabled{opacity:.4;cursor:not-allowed}
+#pickerModal .pick-item.prop-row--dark{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+#pickerModal .pick-item.prop-row--dark:hover{filter:brightness(1.15)}
+#pickerModal .pick-item.prop-row--light{color:#1a1a1a;text-shadow:none}
+#pickerModal .pick-item.prop-row--light:hover{filter:brightness(.95)}
 #pickerModal .pick-cancel{margin-top:12px;width:100%}
 
 /* ============================================================
@@ -3224,6 +3228,7 @@ function startSlyDeal(card) {
       g.cards.forEach(c => {
         targets.push({
           label: `${opp.name}: ${c.name} (${COLOR_LABELS[g.color]})`,
+          propColor: g.color,
           disabled: complete,
           action: () => { closePicker(); sendAction('play_sly_deal', { cardId: card.id, targetPlayerId: opp.id, targetCardId: c.id }); }
         });
@@ -3239,12 +3244,13 @@ function startForcedDeal(card) {
   const myCards = [];
   gameState.you.properties.forEach(g => {
     g.cards.forEach(c => {
-      myCards.push({ label: `${c.name} (${COLOR_LABELS[g.color]})`, card: c, group: g });
+      myCards.push({ label: `${c.name} (${COLOR_LABELS[g.color]})`, card: c, group: g, propColor: g.color });
     });
   });
   if (myCards.length === 0) { toast('You have no properties to offer'); return; }
   openPicker('Choose your property to offer', myCards.map(mc => ({
     label: mc.label,
+    propColor: mc.propColor,
     action: () => {
       closePicker();
       const targets = [];
@@ -3255,6 +3261,7 @@ function startForcedDeal(card) {
           g.cards.forEach(c => {
             targets.push({
               label: `${opp.name}: ${c.name} (${COLOR_LABELS[g.color]})`,
+              propColor: g.color,
               disabled: complete,
               action: () => { closePicker(); sendAction('play_forced_deal', { cardId: card.id, offeredCardId: mc.card.id, targetPlayerId: opp.id, requestedCardId: c.id }); }
             });
@@ -3277,6 +3284,7 @@ function startDealBreaker(card) {
       if (complete) {
         targets.push({
           label: `${opp.name}: ${COLOR_LABELS[g.color]} set (${g.cards.length} cards)`,
+          propColor: g.color,
           action: () => { closePicker(); sendAction('play_deal_breaker', { cardId: card.id, targetPlayerId: opp.id, targetColor: g.color }); }
         });
       }
@@ -3293,9 +3301,9 @@ function pickCompleteSetForHouseHotel(card, actionType) {
     const complete = g.cards.length >= (SET_SIZES[g.color] || 3);
     if (complete && g.color !== 'railroad' && g.color !== 'utility') {
       if (actionType === 'play_house' && !g.hasHouse) {
-        targets.push({ label: `${COLOR_LABELS[g.color]} set`, action: () => { closePicker(); sendAction(actionType, { cardId: card.id, targetColor: g.color }); } });
+        targets.push({ label: `${COLOR_LABELS[g.color]} set`, propColor: g.color, action: () => { closePicker(); sendAction(actionType, { cardId: card.id, targetColor: g.color }); } });
       } else if (actionType === 'play_hotel' && g.hasHouse && !g.hasHotel) {
-        targets.push({ label: `${COLOR_LABELS[g.color]} set`, action: () => { closePicker(); sendAction(actionType, { cardId: card.id, targetColor: g.color }); } });
+        targets.push({ label: `${COLOR_LABELS[g.color]} set`, propColor: g.color, action: () => { closePicker(); sendAction(actionType, { cardId: card.id, targetColor: g.color }); } });
       }
     }
   });
@@ -3306,13 +3314,20 @@ function pickCompleteSetForHouseHotel(card, actionType) {
 // ============================================================
 // PICKER MODAL
 // ============================================================
+const DARK_PROP_COLORS = new Set(['brown','dark_blue','green','railroad','red']);
 function openPicker(title, items) {
   document.getElementById('pickerTitle').textContent = title;
   const list = document.getElementById('pickList');
   list.innerHTML = '';
   items.forEach(item => {
     const div = document.createElement('div');
-    div.className = 'pick-item' + (item.disabled ? ' disabled' : '');
+    let cls = 'pick-item' + (item.disabled ? ' disabled' : '');
+    if (item.propColor) {
+      const isDark = DARK_PROP_COLORS.has(item.propColor);
+      cls += isDark ? ' prop-row--dark' : ' prop-row--light';
+      div.style.background = COLOR_HEX[item.propColor] || '';
+    }
+    div.className = cls;
     div.textContent = item.label;
     if (item.color) div.style.borderLeft = '4px solid ' + item.color;
     if (!item.disabled) {
