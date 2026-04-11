@@ -1,123 +1,188 @@
 # PROJECT STATUS — Monopoly Deal Online
 
-> **Last updated:** Sprint 4 in progress (2026-04-10)
+> **Last updated:** 2026-04-10
 > **Repo:** github.com/TreyMangat/monopoly-deal-online
+> **Live:** https://monopoly-deal-online.onrender.com
 > **Owner:** Trey
+> **Branding:** Keeping "Monopoly Deal" name — private family/friends use only, not published.
 
 ---
 
 ## Architecture Overview
 
-- **Server:** Node.js + TypeScript + `ws` WebSocket library
+- **Server:** Node.js 18+ / TypeScript (strict) / `ws` WebSocket library
 - **Game Engine:** Pure TypeScript, server-authoritative, no I/O
-- **Web Client:** Browser client (vanilla HTML/CSS/JS) — PWA-enabled
-- **iOS Client:** SwiftUI app (28 Swift files)
-- **Hosting:** Render free tier (Docker) — https://monopoly-deal-online.onrender.com
-- **Multiplayer:** WebSocket, 2-6 players across different networks
-- **Room system:** 6-char alphanumeric codes, host starts game
+- **Web Client:** Single-file browser client (`public/index.html`) — vanilla HTML/CSS/JS, PWA-enabled
+- **iOS Client:** SwiftUI app (31 Swift files) — connects to same server
+- **Hosting:** Render free tier, Docker, auto-deploy on push to main
+- **Cold starts:** Free tier spins down after ~15min idle; first request ~30s to wake
+- **Multiplayer:** WebSocket (wss://), 2-6 players across networks, room codes
+
+---
 
 ## Codebase Stats
 
 | Metric | Count |
 |---|---|
-| TypeScript (server) | 3,440 LOC (12 files) |
-| TypeScript (tests) | 1,703 LOC (3 files) |
-| **TypeScript total** | **5,143 LOC** |
-| Swift (iOS client) | 5,455 LOC (28 files) |
-| Web client (HTML/CSS/JS) | 1,498 LOC (1 file) |
-| Tests passing | 51 (32 engine + 11 server + 8 integration) |
+| TypeScript (src/) | 9,871 LOC (16 files) |
+| Web client (HTML/CSS/JS) | 3,973 LOC (1 file) |
+| Swift (iOS client) | 5,939 LOC (31 files) |
+| **Total code** | **~19,800 LOC** |
+| Tests passing | 109 (5 test files) |
+| Test breakdown | 37 bot + 33 engine + 8 full-game + 11 server + 20 vote |
+
+---
 
 ## File Map
 
 ```
-src/shared/types.ts          273 — All TypeScript interfaces and enums
-src/shared/constants.ts       80 — Numeric game rules (set sizes, rent tiers)
-src/shared/cardData.ts       444 — All 106 cards, deck builder
-src/shared/protocol.ts       106 — WebSocket message helpers
-src/engine/GameEngine.ts    1040 — Core: initializeGame() + applyAction()
-src/engine/helpers.ts        283 — Rent calc, set checking, shuffle, lookups
-src/server/GameRoom.ts       648 — Single game room (state + broadcast)
-src/server/RoomManager.ts    210 — Room lifecycle (create, join, cleanup)
-src/server/index.ts          356 — HTTP + WebSocket entry point
-src/__tests__/engine.test.ts           898 — Vitest engine unit tests (32)
-src/__tests__/server-hardening.test.ts 384 — Timer + disconnect tests (11)
-src/__tests__/full-game.test.ts        421 — Full-game integration tests (8)
-public/index.html           1498 — Web client (PWA, card rendering)
-public/manifest.json          24 — PWA manifest
-public/service-worker.js     101 — Offline support + cache strategy
-public/icons/                    — PWA icons (192px, 512px)
-scripts/test-connection.ts   227 — E2E WebSocket test script
-ios/                             — SwiftUI iOS client (28 files, see ios/CLAUDE.md)
-CLAUDE.md                     96 — Claude Code project context
+src/shared/
+  types.ts              291 — All interfaces and enums (Card, GameState, PlayerAction, etc.)
+  constants.ts           80 — Numeric game rules (set sizes, rent tiers, hand limits)
+  cardData.ts           457 — All 106 cards defined, deck builder function
+  protocol.ts           106 — WebSocket message serialization helpers
+
+src/engine/
+  GameEngine.ts        1093 — Core: initializeGame() + applyAction() handles every move
+  helpers.ts            288 — Rent calculation, set checking, shuffle, card lookup utilities
+  BotPlayer.ts         2108 — Bot AI: phase-aware meta strategy (easy/medium/hard)
+  BotManager.ts          99 — Bot lifecycle, naming, difficulty tracking
+
+src/server/
+  GameRoom.ts          1341 — Single game room (state, actions, bots, chat, timers, broadcasting)
+  RoomManager.ts        210 — Room lifecycle (create, join, cleanup, room codes)
+  index.ts              573 — HTTP + WebSocket entry point, message routing
+
+src/__tests__/
+  engine.test.ts        931 — Engine unit tests (33)
+  bot.test.ts          1090 — Bot AI tests (37)
+  full-game.test.ts     428 — Full-game integration tests (8)
+  server-hardening.test.ts 389 — Timer, disconnect, auto-replace tests (11)
+  vote.test.ts          387 — Post-game vote system tests (20)
+
+public/
+  index.html           3973 — Complete web client (CSS + HTML + JS in single file)
+  manifest.json          22 — PWA manifest
+  service-worker.js     103 — Offline support + cache strategy
+  icons/                    — PWA icons (192px, 512px)
+  images/                   — Logo image
+
+ios/
+  CLAUDE.md                 — iOS client context for Claude
+  MonopolyDeal/             — Xcode project (31 Swift files)
+
+Config:
+  CLAUDE.md              96 — Claude Code project context
+  PROJECT_STATUS.md         — This file
+  HANDOFF.md                — Agent onboarding document
+  Dockerfile             16 — Docker build config
+  render.yaml            10 — Render deployment config
+  package.json           34 — Dependencies + scripts
+  tsconfig.json          26 — TypeScript config
 ```
+
+---
 
 ## Completed Work
 
-### Sprint 1 ✅
+### Sprint 1: Engine + Server ✅
 - [x] Card data manifest — all 106 cards with values, rent tiers, set sizes
-- [x] Game engine — all player actions: property, money, bank, rent, all action cards
+- [x] Game engine — all player actions via pure `applyAction()` function
 - [x] Just Say No with counter-chain
 - [x] WebSocket server with room codes, join/create/reconnect
 - [x] Per-player state filtering (opponents' hands hidden)
-- [x] 51 tests passing (32 engine + 11 server hardening + 8 integration)
-- [x] Fixed Double Rent — proper typed state field instead of `any` hack
-- [x] Deploy configs: Dockerfile, railway.json, Procfile, render.yaml
-- [x] E2E test script (scripts/test-connection.ts)
-- [x] CLAUDE.md for Claude Code context
+- [x] Deploy configs: Dockerfile, render.yaml
 
-### Sprint 2 ✅
-- [x] Browser test client (public/index.html) — full playable game in browser
-- [x] Server hardening — turn timers, disconnect handling, rate limiting
-- [x] Engine edge cases — reshuffle, payment wilds, house/hotel teardown
-- [x] Deploy to Render — https://monopoly-deal-online.onrender.com
+### Sprint 2: Server Hardening ✅
+- [x] Turn timers (60s turn, 30s response, 10s disconnected response)
+- [x] Disconnect handling with reconnect grace period (120s)
+- [x] Engine edge cases — reshuffle on empty deck, payment wilds, house/hotel teardown
+- [x] Deploy to Render — live at https://monopoly-deal-online.onrender.com
 
-### Sprint 3 ✅ — iOS Client
-- [x] Xcode project setup (SwiftUI)
-- [x] WebSocket client layer
-- [x] Main menu / create / join screens
-- [x] Game board screen
-- [x] Card interaction (tap → action sheet)
-- [x] Payment demand modal
-- [x] Just Say No chain UI
-- [x] Opponent inspection view
-- [x] Discard selection
-- [x] Action history log
-- [x] Game over screen
+### Sprint 3: iOS Client ✅
+- [x] SwiftUI app with WebSocket client layer
+- [x] All game screens: menu, create, join, game board, game over
+- [x] Card interaction, payment modal, JSN chain UI, opponent inspection, discard
 
-### Sprint 4 (in progress) — PWA + Polish
-- [x] PWA manifest + service worker (offline support)
-- [x] PWA icons (192px, 512px)
-- [x] Card rendering — color-coded backgrounds by type (property/money/action/rent)
+### Sprint 4: PWA + Visual Polish ✅
+- [x] PWA manifest + service worker (offline support, app install)
+- [x] Navy-teal theme with modern cartoony board-game aesthetic
+- [x] Unique action card colors (Pass Go white, Debt Collector blue, Birthday pink, etc.)
 - [x] Wild card gradients (2-color split, rainbow for wild-all)
-- [x] Card layout: bank value badge, centered name, type label
-- [x] Hover effects (scale + shadow)
-- [x] Your-turn pulsing teal border indicator
-- [x] Action toast notifications (3s centered popup on each play)
-- [x] Room code: monospace font + copy-to-clipboard button
-- [x] Mobile responsive card sizing (viewport < 400px)
+- [x] Card layout: bank value badge, centered name, type label, rent tiers
+- [x] Hover effects, your-turn pulsing border, action toast notifications
+- [x] Logo image on landing and lobby screens
+- [x] Mobile responsive card sizing
+
+### Sprint 5: Bot System ✅
+- [x] Three difficulty levels: Easy (random), Medium (fair), Hard (meta strategy)
+- [x] Hard bot: phase-aware strategy (early banking, mid-game strategy, late-game disruption)
+- [x] Threat scoring, opponent modeling, payment optimization
+- [x] Bot pacing: slower delays (2-4.5s) with "thinking" indicator for readability
+- [x] Bot turn banner with animated dots
+- [x] Difficulty labels in lobby and in-game (color-coded)
+- [x] Auto-replace disconnected players with medium bot after grace period
+- [x] Bot inherits disconnected player's name + "(Bot)" suffix
+
+### Sprint 6: Vote System + Host Controls ✅
+- [x] Post-game vote: "Play Again" vs "Leave" with 30s countdown
+- [x] Host can force-end active games
+- [x] Early quit for players who haven't played any cards
+- [x] Replace-with-bot button for disconnected players
+
+### Sprint 7: Chat + Bug Fixes ✅
+- [x] In-game chat system (slide-up panel, rate-limited, sanitized, unread dot)
+- [x] Randomized starting player (not always host)
+- [x] Fixed Just Say No button (z-index was behind payment modal)
+- [x] Prevent double Debt Collector targeting same player per turn
+- [x] Unified discard pile colors with hand card CSS
+- [x] Rent tier display on property cards
+- [x] Bank log privacy (opponents see "added 1 card" not dollar values)
+- [x] FIFO bank display (show card count, not lowest value)
+- [x] Stacked discard pile (top 2 cards visible)
+- [x] Fixed opponent property color label clipping
+- [x] Dramatic steal modal with screen effects
+- [x] Payment received confirmation modal
+
+---
+
+## Current Sprint: Polish & Bug Fixes
+
+### Outstanding Items
 - [ ] Card animations (flip, slide, deal)
-- [ ] Sound effects
+- [ ] Sound effects system (currently basic)
 - [ ] Haptic feedback (iOS)
-- [ ] Xcode integration testing on simulator + physical device
+- [ ] iOS Xcode integration testing on simulator + physical device
 - [ ] App Store prep
+- [ ] Host "clear chat" button (server handler exists, UI button not wired)
+
+### Known Issues
+- 1 flaky test: "should not allow early quit after cards have been played" — depends on random card deal having a money card; passes in isolation, occasionally fails when run with other test files due to timer leaking
+- Free tier cold starts (~30s first load)
+- No reconnect for chat history (new connection starts with empty chat)
+
+---
 
 ## Game Rules — Quick Reference
 
 - 106 cards/deck (212 for 6 players)
-- Draw 2/turn (5 if hand empty)
+- Draw 2/turn (5 if hand empty at start of turn)
 - Play up to 3 cards/turn
-- 7-card hand limit
-- Win: 3 complete sets of DIFFERENT colors
+- 7-card hand limit (discard excess at end of turn, non-property first)
+- Win: 3 complete property sets of DIFFERENT colors
 - Just Say No chains (counter with another JSN)
-- No change on payment
-- House/Hotel only on complete sets (not railroad/utility)
-- Hotel requires House first
+- No change on payment (overpayment is lost)
+- House/Hotel only on complete sets (not railroad/utility); Hotel requires House
 - Can't steal from complete sets (Sly Deal, Forced Deal)
 - CAN steal complete sets (Deal Breaker)
+- Can't target the same player with Debt Collector twice in one turn
+- Wild cards: swap between valid colors costs 1 action; rainbow wild ($0) can't be used as payment
+- Property cards can't be discarded if you have enough non-property cards to discard
+
+---
 
 ## Agent Workflow
 
-- **Claude Chat (claude.ai):** Project manager — architecture, planning, prompts
-- **Claude Code (terminal):** Implementation — parallel terminals, non-overlapping tasks
-- **ChatGPT:** Design, documentation, research, iOS-specific guidance
+- **Claude Code (terminal):** Primary implementation tool — parallel work, auto-commit
+- **ChatGPT:** Design, documentation, iOS-specific guidance
 - **Rule:** Always update this file when a sprint completes
