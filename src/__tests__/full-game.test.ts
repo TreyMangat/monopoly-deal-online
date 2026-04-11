@@ -426,3 +426,327 @@ describe("Full Game Integration", () => {
     expect(s.players[0].bank.some(c => c.id === "m2_only")).toBe(true);
   });
 });
+
+// ---- Win-Path Regression Tests ----
+
+function wild2(id: string, color: PropertyColor, altColor: PropertyColor, name: string, value: number): Card {
+  return { id, type: CardType.PropertyWild, name, bankValue: value, color, altColor };
+}
+
+function wildAll(id: string): Card {
+  return { id, type: CardType.PropertyWildAll, name: "Wild Property", bankValue: 0 };
+}
+
+/**
+ * Creates a game state where P1 is 1 property away from winning.
+ * P1 has Brown (2/2) complete and Utility (2/2) complete.
+ * P1 needs 1 more LightBlue to complete the 3rd set (has 2/3).
+ */
+function createNearWinGame(): GameState {
+  return {
+    roomCode: "WINTEST",
+    deck: [
+      money("dk5", 1), money("dk4", 1), money("dk3", 1),
+      money("dk2", 2), money("dk1", 2),
+    ],
+    discardPile: [],
+    players: [
+      {
+        id: "p1", name: "Alice", avatar: 0,
+        hand: [
+          prop("connecticut", PropertyColor.LightBlue, "Connecticut Avenue", 1),
+          money("m1_p1", 1),
+          money("m2_p1", 2),
+        ],
+        bank: [money("m10_p1", 10)],
+        properties: [
+          { color: PropertyColor.Brown, cards: [
+            prop("med", PropertyColor.Brown, "Mediterranean Avenue", 1),
+            prop("baltic", PropertyColor.Brown, "Baltic Avenue", 1),
+          ], hasHouse: false, hasHotel: false },
+          { color: PropertyColor.Utility, cards: [
+            prop("electric", PropertyColor.Utility, "Electric Company", 2),
+            prop("water", PropertyColor.Utility, "Water Works", 2),
+          ], hasHouse: false, hasHotel: false },
+          { color: PropertyColor.LightBlue, cards: [
+            prop("oriental", PropertyColor.LightBlue, "Oriental Avenue", 1),
+            prop("vermont", PropertyColor.LightBlue, "Vermont Avenue", 1),
+          ], hasHouse: false, hasHotel: false },
+        ],
+        connected: true,
+      },
+      {
+        id: "p2", name: "Bob", avatar: 1,
+        hand: [
+          money("m1_p2", 1),
+          money("m2_p2", 2),
+          money("m3_p2", 3),
+        ],
+        bank: [money("m5_p2", 5)],
+        properties: [
+          { color: PropertyColor.DarkBlue, cards: [
+            prop("boardwalk", PropertyColor.DarkBlue, "Boardwalk", 4),
+            prop("park", PropertyColor.DarkBlue, "Park Place", 4),
+          ], hasHouse: false, hasHotel: false },
+        ],
+        connected: true,
+      },
+    ],
+    currentPlayerIndex: 0,
+    actionsRemaining: 3,
+    phase: TurnPhase.Play,
+    pendingAction: null,
+    turnNumber: 3,
+    winnerId: null,
+    useDoubleDeck: false,
+    doubleRentActive: false,
+  };
+}
+
+describe("Win-Path Regression Tests", () => {
+
+  it("win by placing property card to complete 3rd set", () => {
+    let s = createNearWinGame();
+
+    // P1 plays Connecticut (3rd LightBlue) → completes 3rd set → win
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "connecticut", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win by placing 2-color wild card to complete 3rd set", () => {
+    let s = createNearWinGame();
+    // Replace Connecticut in hand with a LightBlue/Brown wild
+    s.players[0].hand[0] = wild2(
+      "wild_lb_br", PropertyColor.LightBlue, PropertyColor.Brown,
+      "Wild: LightBlue/Brown", 4
+    );
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "wild_lb_br", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win by placing rainbow wild to complete 3rd set", () => {
+    let s = createNearWinGame();
+    // Replace Connecticut with a rainbow wild
+    s.players[0].hand[0] = wildAll("wild_rainbow");
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "wild_rainbow", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win via Deal Breaker stealing 3rd complete set", () => {
+    let s = createNearWinGame();
+    // Remove LightBlue incomplete set (we'll win by stealing DarkBlue instead)
+    s.players[0].properties = s.players[0].properties.filter(g => g.color !== PropertyColor.LightBlue);
+    // Give P1 a 3rd complete set source: steal P2's complete DarkBlue
+    s.players[0].hand.push({
+      id: "dealbrk1", type: CardType.ActionDealBreaker,
+      name: "Deal Breaker", bankValue: 5,
+    });
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayDealBreaker, playerId: "p1",
+      cardId: "dealbrk1", targetPlayerId: "p2",
+      targetColor: PropertyColor.DarkBlue,
+    }));
+    expect(s.phase).toBe(TurnPhase.AwaitingResponse);
+
+    // P2 accepts the steal
+    s = ok(applyAction(s, { type: ActionType.AcceptAction, playerId: "p2" }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+    // P1 now has Brown + Utility + DarkBlue = 3 complete sets
+    expect(s.players[0].properties.find(g => g.color === PropertyColor.DarkBlue)).toBeDefined();
+  });
+
+  it("win via receiving property as payment completing 3rd set", () => {
+    let s = createNearWinGame();
+    // Replace P1's LightBlue with 2/3 Red
+    s.players[0].properties = s.players[0].properties.filter(g => g.color !== PropertyColor.LightBlue);
+    s.players[0].properties.push({
+      color: PropertyColor.Red, cards: [
+        prop("indiana", PropertyColor.Red, "Indiana Avenue", 3),
+        prop("illinois", PropertyColor.Red, "Illinois Avenue", 3),
+      ], hasHouse: false, hasHotel: false,
+    });
+
+    // P2 has a Red property that would complete P1's set
+    s.players[1].properties.push({
+      color: PropertyColor.Red, cards: [
+        prop("kentucky", PropertyColor.Red, "Kentucky Avenue", 3),
+      ], hasHouse: false, hasHotel: false,
+    });
+    s.players[1].bank = []; // Force P2 to pay with properties
+
+    // P1 plays Debt Collector on P2
+    s.players[0].hand.push({
+      id: "dc1", type: CardType.ActionDebtCollector,
+      name: "Debt Collector", bankValue: 3, actionValue: 5,
+    });
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayDebtCollector, playerId: "p1",
+      cardId: "dc1", targetPlayerId: "p2",
+    }));
+    expect(s.phase).toBe(TurnPhase.AwaitingResponse);
+
+    // P2 pays with kentucky ($3) + boardwalk ($4) = $7 >= $5
+    s = ok(applyAction(s, {
+      type: ActionType.PayWithCards, playerId: "p2",
+      cardIds: ["kentucky", "boardwalk"],
+    }));
+
+    // Kentucky (Red) goes to P1's Red group → completes 3rd set → WIN
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win on action 3 of 3 (max actions used on winning move)", () => {
+    let s = createNearWinGame();
+
+    // Use up 2 actions first
+    s = ok(applyAction(s, {
+      type: ActionType.PlayMoneyToBank, playerId: "p1", cardId: "m1_p1",
+    }));
+    s = ok(applyAction(s, {
+      type: ActionType.PlayMoneyToBank, playerId: "p1", cardId: "m2_p1",
+    }));
+    expect(s.actionsRemaining).toBe(1);
+
+    // 3rd action: play winning property
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "connecticut", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+    // Should NOT be in Discard phase even though actions exhausted
+    expect(s.phase).not.toBe(TurnPhase.Discard);
+  });
+
+  it("win with hand > 7 cards — hand limit should NOT enforce on winning turn", () => {
+    let s = createNearWinGame();
+    // Add extra cards to give P1 a huge hand (10 cards)
+    for (let i = 1; i <= 8; i++) {
+      s.players[0].hand.push(money(`extra${i}`, 1));
+    }
+    expect(s.players[0].hand.length).toBe(11); // 3 original + 8 extra
+
+    // Play winning property on action 1
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "connecticut", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    // Game should be over, NOT in discard phase
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+    expect(s.players[0].hand.length).toBe(10); // 11 - 1 played, still > 7 but doesn't matter
+  });
+
+  it("win with hand > 7 on action 3/3 — no discard forced", () => {
+    let s = createNearWinGame();
+    // Add extra cards to P1's hand
+    for (let i = 1; i <= 6; i++) {
+      s.players[0].hand.push(money(`extra${i}`, 1));
+    }
+    // hand = 9, use 2 actions banking, then play winning property
+    s = ok(applyAction(s, {
+      type: ActionType.PlayMoneyToBank, playerId: "p1", cardId: "m1_p1",
+    }));
+    s = ok(applyAction(s, {
+      type: ActionType.PlayMoneyToBank, playerId: "p1", cardId: "m2_p1",
+    }));
+    // hand = 7, but add more to hand to simulate > 7
+    s.players[0].hand.push(money("latecard1", 1), money("latecard2", 1));
+    // hand = 9 now, actions = 1
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "connecticut", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    // Win should take precedence over discard
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win while having house/hotel on another complete set", () => {
+    let s = createNearWinGame();
+    // Add house + hotel to Brown set
+    s.players[0].properties[0].hasHouse = true;
+    s.players[0].properties[0].hasHotel = true;
+
+    s = ok(applyAction(s, {
+      type: ActionType.PlayPropertyCard, playerId: "p1",
+      cardId: "connecticut", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+    // House/hotel should still be on Brown set
+    const brown = s.players[0].properties.find(g => g.color === PropertyColor.Brown);
+    expect(brown!.hasHouse).toBe(true);
+    expect(brown!.hasHotel).toBe(true);
+  });
+
+  it("win via moveWildCard completing 3rd set", () => {
+    let s = createNearWinGame();
+    // Remove Connecticut from hand (not needed)
+    s.players[0].hand = s.players[0].hand.filter(c => c.id !== "connecticut");
+
+    // Add a LightBlue/Brown wild to Brown group (already complete with 2+1=3 cards)
+    const wildCard = wild2(
+      "wild_lb_br", PropertyColor.LightBlue, PropertyColor.Brown,
+      "Wild: LightBlue/Brown", 4
+    );
+    s.players[0].properties[0].cards.push(wildCard); // Brown now has 3 cards
+
+    // Move the wild from Brown to LightBlue → LightBlue becomes 3/3 → 3rd complete set
+    s = ok(applyAction(s, {
+      type: ActionType.MoveWildCard, playerId: "p1",
+      cardId: "wild_lb_br", destinationColor: PropertyColor.LightBlue,
+    }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+
+  it("win via endTurn when sets were already complete (hand > 7)", () => {
+    let s = createNearWinGame();
+    // Complete the 3rd set directly in properties (skip playing)
+    s.players[0].properties[2].cards.push(
+      prop("connecticut_auto", PropertyColor.LightBlue, "Connecticut Avenue", 1)
+    );
+    // Remove connecticut from hand
+    s.players[0].hand = s.players[0].hand.filter(c => c.id !== "connecticut");
+    // Add extra cards to make hand > 7
+    for (let i = 1; i <= 8; i++) {
+      s.players[0].hand.push(money(`pad${i}`, 1));
+    }
+    // P1 now has 3 complete sets and 10 cards in hand
+
+    // End turn — should detect win, NOT force discard
+    s = ok(applyAction(s, { type: ActionType.EndTurn, playerId: "p1" }));
+
+    expect(s.phase).toBe(TurnPhase.GameOver);
+    expect(s.winnerId).toBe("p1");
+  });
+});

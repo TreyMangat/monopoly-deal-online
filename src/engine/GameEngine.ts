@@ -202,6 +202,9 @@ function consumePlay(state: GameState): void {
 }
 
 function checkAutoEndTurn(state: GameState): GameState {
+  // Never clobber a game-over state
+  if (state.phase === TurnPhase.GameOver) return state;
+
   const player = getCurrentPlayer(state);
   if (state.actionsRemaining <= 0 && state.phase === TurnPhase.Play) {
     if (player.hand.length > MAX_HAND_SIZE) {
@@ -284,13 +287,16 @@ function playPropertyCard(
   consumePlay(state);
 
   const desc = `${player.name} played ${card.name} to ${destColor}`;
-  checkAutoEndTurn(state);
 
-  // Check for immediate win
+  // Check for immediate win BEFORE auto-end-turn to avoid unnecessary
+  // discard phase or turn advancement on a game-winning move
   if (hasWon(player)) {
     state.winnerId = player.id;
     state.phase = TurnPhase.GameOver;
+    return { ok: true, state, description: desc };
   }
+
+  checkAutoEndTurn(state);
 
   return { ok: true, state, description: desc };
 }
@@ -805,6 +811,14 @@ function moveWildCard(
   consumePlay(state);
 
   const desc = `${player.name} moved ${card.name} to ${action.destinationColor}`;
+
+  // Check if moving the wild completed the 3rd set
+  if (hasWon(player)) {
+    state.winnerId = player.id;
+    state.phase = TurnPhase.GameOver;
+    return { ok: true, state, description: desc };
+  }
+
   checkAutoEndTurn(state);
 
   return { ok: true, state, description: desc };
@@ -813,6 +827,14 @@ function moveWildCard(
 // ---- End Turn / Discard ----
 
 function endTurn(state: GameState, player: PlayerState): EngineResult {
+  // Win check before hand limit — a winning player should never be forced to discard
+  if (hasWon(player)) {
+    state.winnerId = player.id;
+    state.phase = TurnPhase.GameOver;
+    const desc = `${player.name} ended their turn`;
+    return { ok: true, state, description: desc };
+  }
+
   if (player.hand.length > MAX_HAND_SIZE) {
     state.phase = TurnPhase.Discard;
     const desc = `${player.name} must discard to ${MAX_HAND_SIZE} cards`;
@@ -945,7 +967,8 @@ function handlePayment(
   if (!action.cardIds) return { ok: false, error: "No cards to pay with" };
 
   const amountOwed = pending.amount || 0;
-  const fromPlayer = getPlayer(state, pending.fromPlayerId)!;
+  const fromPlayer = getPlayer(state, pending.fromPlayerId);
+  if (!fromPlayer) return { ok: false, error: "Collecting player not found" };
 
   // Collect payment cards (from bank and/or properties)
   let totalPaid = 0;
@@ -1007,7 +1030,14 @@ function handlePayment(
   ) {
     state.pendingAction = null;
     state.phase = TurnPhase.Play;
-    checkAutoEndTurn(state);
+
+    // Check if receiving property cards as payment completed the collector's 3rd set
+    if (hasWon(fromPlayer)) {
+      state.winnerId = fromPlayer.id;
+      state.phase = TurnPhase.GameOver;
+    } else {
+      checkAutoEndTurn(state);
+    }
   }
 
   return { ok: true, state, description: desc };
@@ -1019,7 +1049,8 @@ function handleAcceptAction(
   player: PlayerState
 ): EngineResult {
   const pending = state.pendingAction!;
-  const fromPlayer = getPlayer(state, pending.fromPlayerId)!;
+  const fromPlayer = getPlayer(state, pending.fromPlayerId);
+  if (!fromPlayer) return { ok: false, error: "Action initiator not found" };
 
   // Handle counter Just Say No — accepting means the JSN wins
   if (pending.type === PendingActionType.CounterJustSayNo) {
@@ -1079,13 +1110,13 @@ function handleAcceptAction(
     state.pendingAction = null;
     state.phase = TurnPhase.Play;
 
-    // Check if the action resulted in a win
+    // Check if the action resulted in a win (Deal Breaker, Sly Deal, Forced Deal)
     if (hasWon(fromPlayer)) {
       state.winnerId = fromPlayer.id;
       state.phase = TurnPhase.GameOver;
+    } else {
+      checkAutoEndTurn(state);
     }
-
-    checkAutoEndTurn(state);
   }
 
   const desc = `${player.name} accepted the action`;

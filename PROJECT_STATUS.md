@@ -28,8 +28,8 @@
 | Web client (HTML/CSS/JS) | 3,973 LOC (1 file) |
 | Swift (iOS client) | 5,939 LOC (31 files) |
 | **Total code** | **~19,800 LOC** |
-| Tests passing | 109 (5 test files) |
-| Test breakdown | 37 bot + 33 engine + 8 full-game + 11 server + 20 vote |
+| Tests passing | 126 (5 test files) |
+| Test breakdown | 37 bot + 33 engine + 19 full-game + 17 server + 20 vote |
 
 ---
 
@@ -152,6 +152,26 @@ Config:
 - [x] Board preview in steal/JSN modal (your sets + attacker sets + JSN count)
 - [x] Stronger your-turn indicator (teal glow on deck, floating arrow, thicker border pulse)
 - [x] Compact opponent bar for 4+ players on mobile (collapsed property pills, truncated names)
+
+### Sprint 9: Critical Bug Fixes ✅
+**Room-vanish investigation** — Both players saw "No room found" mid-game near a win.
+- [x] Root cause: uncaught exception in `applyAction()` could crash the entire Node process, killing all in-memory rooms. Secondary: cleanup race condition deleted rooms during reconnect grace period.
+- [x] Wrapped `applyAction()` and `broadcastGameState()` in try/catch — errors logged + sent to client, room survives
+- [x] Added `isProtectedFromCleanup()` — rooms with active grace timers or in Voting/Playing state immune to cleanup
+- [x] Fixed `isEmpty()` to exclude bot players (bots have `ws=null` but are active)
+- [x] Added ISO-timestamped diagnostic logging (`[ROOM:code]`, `[SERVER]` prefixes) on all lifecycle events
+- [x] 6 server-hardening regression tests (simultaneous disconnect, vote state, engine error resilience)
+
+**Engine win-path audit** — 6 bugs in win-detection logic that could prevent wins or cause state corruption.
+- [x] `checkAutoEndTurn` GameOver guard — prevents clobbering a won game with Discard phase
+- [x] `playPropertyCard` — win check moved before auto-end-turn; return early on win
+- [x] `moveWildCard` — added missing win check (moving wild to complete 3rd set)
+- [x] `endTurn` — win check before hand-limit enforcement (winning player shouldn't discard)
+- [x] `handlePayment` — added win check when receiving property as payment completes 3rd set
+- [x] `handleAcceptAction` — moved `checkAutoEndTurn` into else branch of win check
+- [x] Replaced unsafe `!` non-null assertions with explicit null checks in payment/accept paths
+- [x] 11 win-path regression tests (wild cards, Deal Breaker, payment win, action 3/3, hand > 7, house/hotel, moveWild)
+- Full investigation details: `INVESTIGATION_ROOM_VANISH.md`
 
 ---
 

@@ -156,3 +156,76 @@ The `applyAction()` function in `src/engine/GameEngine.ts` needs auditing for un
 - Any `find()` that could return undefined and then be dereferenced
 
 This is the upstream cause of Hypothesis 5, but the server-side try/catch is the correct defensive fix.
+
+---
+
+## Engine Audit
+
+**Date**: 2026-04-10
+**Scope**: `src/engine/GameEngine.ts` and `src/engine/helpers.ts`
+
+### Explicit throws
+
+No `throw` statements exist anywhere in the engine or helpers. All error conditions return `{ ok: false, error: "..." }`. This means any crash must come from a **runtime TypeError** (accessing property of undefined).
+
+### Non-null assertion sites (potential TypeError sources)
+
+| Location | Code | Could fire on win? | Risk |
+|----------|------|---------------------|------|
+| GameEngine.ts:948 | `getPlayer(state, pending.fromPlayerId)!` in handlePayment | **Yes** — if collecting player ID was stale after bot replacement | **HIGH** — accessing `.bank` on undefined → TypeError |
+| GameEngine.ts:1022 | `getPlayer(state, pending.fromPlayerId)!` in handleAcceptAction | **Yes** — same stale-ID scenario | **HIGH** |
+| GameEngine.ts:988 | `card.color!` in handlePayment property transfer | Maybe — PropertyWildAll has `color: undefined` | LOW — fallback to Brown exists, no throw |
+| GameEngine.ts:914 | `state.pendingAction!` in handleJustSayNo | No — only reached when pendingAction exists | NONE |
+
+### Win-detection bugs found
+
+#### Bug 1: `playPropertyCard` — checkAutoEndTurn before win check
+- **File**: GameEngine.ts:284-293
+- **Trigger**: Player places property completing 3rd set on their last action (action 3/3) with hand > 7
+- **What happens**: `consumePlay` → actionsRemaining = 0 → `checkAutoEndTurn` → hand > 7 → `phase = Discard`. Then win check overrides to GameOver. The state oscillated through an invalid intermediate (Discard on a game-over board).
+- **Could it fire during winning move?** **Yes** — this is the exact scenario
+- **Fix**: Check win BEFORE checkAutoEndTurn; return early on win
+
+#### Bug 2: `handlePayment` — no win check after property transfer
+- **File**: GameEngine.ts:1000-1013
+- **Trigger**: Collecting player receives property cards as payment that complete their 3rd set of different colors
+- **What happens**: Payment transfers property to collector, sets phase = Play, calls checkAutoEndTurn. Win is NOT checked. Game continues as if collector hasn't won.
+- **Could it fire during winning move?** **Yes** — rent/debt/birthday payment with properties
+- **Fix**: Add `hasWon(fromPlayer)` check after all payments received
+
+#### Bug 3: `moveWildCard` — missing win check entirely
+- **File**: GameEngine.ts:800-811
+- **Trigger**: Player moves a wild card to a new color group, completing the 3rd set
+- **What happens**: Card moved, action consumed, checkAutoEndTurn runs but doesn't detect win (only advanceTurn checks win, and only if actions exhausted + hand <= 7)
+- **Could it fire during winning move?** **Yes** — moving a 2-color wild or rainbow wild to complete a set
+- **Fix**: Add `hasWon(player)` check after placing card
+
+#### Bug 4: `endTurn` — hand limit before win check
+- **File**: GameEngine.ts:815-825
+- **Trigger**: Player has 3 complete sets but > 7 cards when ending turn
+- **What happens**: `endTurn` sees hand > 7, sets `phase = Discard`, returns. Player must discard before `advanceTurn` eventually detects win.
+- **Could it fire during winning move?** **Yes** — particularly after Pass Go draws extra cards
+- **Fix**: Check win BEFORE hand limit; return GameOver immediately
+
+#### Bug 5: `checkAutoEndTurn` — no GameOver guard
+- **File**: GameEngine.ts:204-214
+- **Trigger**: Win is set elsewhere (e.g., playPropertyCard line 290), then checkAutoEndTurn runs and could set phase to Discard or call advanceTurn
+- **What happens**: Could overwrite `TurnPhase.GameOver` with `TurnPhase.Discard` if hand > 7, or advance the turn past the winner
+- **Could it fire during winning move?** **Yes** — if win check and checkAutoEndTurn are in the wrong order
+- **Fix**: Early return when `state.phase === TurnPhase.GameOver`
+
+#### Bug 6: `handleAcceptAction` — checkAutoEndTurn after win (fragile)
+- **File**: GameEngine.ts:1076-1089
+- **Trigger**: Deal Breaker steal completes 3rd set, win is detected, then checkAutoEndTurn still runs
+- **What happens**: Pre-fix, checkAutoEndTurn could clobber the GameOver phase. With the GameOver guard (Bug 5 fix), this is now safe. But moving checkAutoEndTurn into `else` branch makes intent explicit.
+- **Fix**: Move checkAutoEndTurn into else branch of win check
+
+### Fixes Applied
+
+1. `checkAutoEndTurn`: added `if (state.phase === TurnPhase.GameOver) return state;` guard
+2. `playPropertyCard`: win check moved before checkAutoEndTurn, returns early on win
+3. `moveWildCard`: added `hasWon()` check after card placement
+4. `endTurn`: win check before hand limit enforcement
+5. `handlePayment`: added `hasWon(fromPlayer)` after all payments collected
+6. `handleAcceptAction`: moved checkAutoEndTurn into `else` branch
+7. Replaced `!` non-null assertions on `getPlayer()` calls with explicit null checks that return error
