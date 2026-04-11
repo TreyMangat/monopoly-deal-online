@@ -282,6 +282,8 @@ export class GameRoom {
       return { success: false, error: "Room is full" };
     }
 
+    // Tell bot manager about human names so it can avoid collisions
+    this.botManager.setHumanNames(this.players.map((p) => p.name));
     const botInfo = this.botManager.createBot(difficulty);
     this._hasBots = true;
 

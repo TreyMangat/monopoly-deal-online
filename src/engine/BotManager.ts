@@ -17,12 +17,16 @@ export interface BotInfo {
 }
 
 const BOT_NAMES = [
-  "DealBot",
-  "CardShark",
-  "Mr. Money",
-  "RentKing",
-  "SetCollector",
-  "WildCard",
+  "Bluebert",
+  "Garebear",
+  "Chingo",
+  "Osama",
+  "Mergatroid",
+  "Snorbax",
+  "Klaus",
+  "Pibbles",
+  "Tronk",
+  "Wuzzle",
 ];
 
 const BOT_AVATARS = [10, 11, 12, 13, 14, 15];
@@ -31,15 +35,25 @@ export class BotManager {
   private bots: Map<string, BotInfo> = new Map();
   private usedNames: Set<string> = new Set();
   private nextAvatarIndex: number = 0;
+  private nextNameIndex: number = 0;
+
+  /** Names of human players in the room, used for collision avoidance */
+  private humanNames: Set<string> = new Set();
+
+  setHumanNames(names: string[]): void {
+    this.humanNames = new Set(names);
+  }
 
   createBot(difficulty: BotDifficulty): BotInfo {
     const id = `bot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    // Pick a unique name
+    // Rotate through the name pool, skipping collisions with humans or already-used names
     let name = "Bot";
-    for (const n of BOT_NAMES) {
-      if (!this.usedNames.has(n)) {
-        name = n;
+    for (let attempts = 0; attempts < BOT_NAMES.length; attempts++) {
+      const candidate = BOT_NAMES[this.nextNameIndex % BOT_NAMES.length];
+      this.nextNameIndex++;
+      if (!this.usedNames.has(candidate) && !this.humanNames.has(candidate)) {
+        name = candidate;
         break;
       }
     }
@@ -94,6 +108,8 @@ export class BotManager {
   clear(): void {
     this.bots.clear();
     this.usedNames.clear();
+    this.humanNames.clear();
     this.nextAvatarIndex = 0;
+    this.nextNameIndex = 0;
   }
 }
