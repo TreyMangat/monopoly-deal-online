@@ -30,6 +30,7 @@
 | **Total code** | **~19,800 LOC** |
 | Tests passing | 150 (5 test files) |
 | Test breakdown | 44 bot + 33 engine + 30 full-game + 23 server + 20 vote |
+| Codebase sweep | 0 TODOs, 0 `as any` in prod, all logs tagged |
 
 ---
 
@@ -205,6 +206,32 @@ Config:
 - [x] Turn timer confirmed paused during disconnected player's grace period
 - [x] 6 reconnect regression tests (turn pause, valid rejoin, invalid session, nonexistent room, rapid cycles, grace period)
 - Full analysis: `INVESTIGATION_RECONNECT.md`
+
+### Sprint 12: Critical Fixes ✅
+**Area 1: Render disconnect resilience — invisible recovery**
+- [x] Aggressive reconnect: 0ms, 250ms, 500ms first 3 attempts — most disconnects invisible to user
+- [x] Suppress "Reconnecting..." overlay for <1.5s fast recoveries; show subtle "Reconnected" toast
+- [x] Grace period extended 120s → 180s (matches client 5min window)
+- [x] Application-level heartbeat every 25s (JSON, traverses HTTP proxies unlike WS control frames)
+- [x] Free-tier notice on main menu: "brief disconnects may occur but games auto-resume"
+- [x] Permanent fix options documented in INVESTIGATION_RECONNECT.md
+
+**Area 2: Payment system fixes**
+- [x] Timeout auto-pay now uses minimum-overpayment algorithm (was: take EVERYTHING the player owns)
+- [x] Extracted `calculateMinimumPayment()` to helpers.ts — shared by bot AI and server timeout
+- [x] Bot payment code in BotPlayer.ts now delegates to shared helper (no duplication)
+
+**Area 3: State desync prevention**
+- [x] `stateVersion` counter on GameState — incremented on every applyAction
+- [x] Client ignores out-of-order state updates (stateVersion < current)
+- [x] Server `RESYNC` message handler — client can request full state replacement
+- [x] Client resync via triple-tap game header (debug mechanism)
+- [x] `sendStateToPlayer` made public for resync support
+
+**Bonus fixes found during sweep**
+- [x] Bot Debt Collector now respects `chargedThisTurn` (was: could target same player twice, causing engine rejection)
+- [x] Heartbeat/Resync message types added to ClientMessageType and ServerMessageType
+- [x] Full codebase sweep: 0 TODOs, 0 `as any` in prod, all logs tagged — see SWEEP_NOTES.md
 
 ## Current Sprint: Polish & Bug Fixes
 
