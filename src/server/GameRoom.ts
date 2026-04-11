@@ -160,6 +160,10 @@ export class GameRoom {
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return false;
 
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Player "${player.name}" (${playerId}) reconnecting — status=${this.status}`
+    );
+
     player.ws = ws;
     player.disconnectedAt = null;
 
@@ -905,6 +909,9 @@ export class GameRoom {
   // ---- Vote System ----
 
   startVote(): void {
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Game ended — entering vote phase`
+    );
     this.status = RoomStatus.Voting;
     this.votes.clear();
     this.clearTimers();
@@ -971,6 +978,10 @@ export class GameRoom {
 
   resolveVote(): void {
     if (this.status !== RoomStatus.Voting) return;
+
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Resolving vote — ${[...this.votes.entries()].map(([id, v]) => `${id}=${v}`).join(", ")}`
+    );
 
     this.clearVoteTimer();
     this.clearVoteTimerInterval();
@@ -1397,6 +1408,9 @@ export class GameRoom {
 
   /** Clean up all timers when the room is destroyed */
   destroy(): void {
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Room destroyed — status=${this.status}, players=${this.players.length}`
+    );
     this.clearTimers();
     this.clearVoteTimer();
     this.clearVoteTimerInterval();
