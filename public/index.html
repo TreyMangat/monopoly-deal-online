@@ -773,6 +773,18 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   transition:top .4s cubic-bezier(.175,.885,.32,1.275);max-width:80%}
 #actionToast.active{top:calc(12px + var(--safe-top))}
 
+/* Bot Turn Banner */
+#botTurnBanner{position:fixed;top:calc(var(--safe-top));left:0;width:100%;z-index:450;
+  display:none;justify-content:center;padding:6px 0;pointer-events:none}
+#botTurnBanner.active{display:flex}
+#botTurnBanner .btb-inner{background:rgba(15,30,54,.9);color:var(--muted);font-size:12px;
+  font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:6px 20px;
+  border-radius:0 0 12px 12px;border:1px solid rgba(255,255,255,.06);border-top:none;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#botTurnBanner .btb-dots{display:inline-block;width:18px;text-align:left}
+@keyframes botDots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+#botTurnBanner .btb-dots::after{content:'';animation:botDots 1.2s steps(4,end) infinite}
+
 /* Connection Status */
 #connStatus{position:fixed;top:0;left:0;width:100%;background:var(--accent);color:#fff;text-align:center;
   padding:6px;padding-top:calc(6px + var(--safe-top));font-size:12px;font-weight:600;z-index:600;
@@ -986,6 +998,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 <!-- Toast -->
 <div id="toast"></div>
 <div id="actionToast"></div>
+<div id="botTurnBanner"><div class="btb-inner">&#129302; Bot Turn<span class="btb-dots"></span></div></div>
 
 <!-- ============ LANDING ============ -->
 <div id="landing" class="screen active">
@@ -1038,12 +1051,21 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
     <p class="sub" style="text-align:center;margin:8px 0 16px;color:var(--muted)">Share this code with friends</p>
     <ul class="player-list" id="lobbyPlayers"></ul>
   </div>
-  <div id="addBotArea" style="display:none;width:100%;max-width:380px">
+  <div id="addBotArea" style="display:none;width:100%;max-width:420px">
     <p style="color:var(--muted);font-size:12px;text-align:center;margin-bottom:8px">Add AI Bot</p>
     <div style="display:flex;gap:8px;justify-content:center">
-      <button class="btn-small" style="background:rgba(46,125,50,.2);color:#4CAF50;border:1px solid rgba(46,125,50,.3)" onclick="addBot('easy')">Easy &#128994;</button>
-      <button class="btn-small" style="background:rgba(255,193,7,.2);color:#FFC107;border:1px solid rgba(255,193,7,.3)" onclick="addBot('medium')">Medium &#128993;</button>
-      <button class="btn-small" style="background:rgba(244,67,54,.2);color:#F44336;border:1px solid rgba(244,67,54,.3)" onclick="addBot('hard')">Hard &#128308;</button>
+      <div style="text-align:center;flex:1">
+        <button class="btn-small" style="background:rgba(46,125,50,.2);color:#4CAF50;border:1px solid rgba(46,125,50,.3);width:100%" onclick="addBot('easy')">Easy &#128994;</button>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Random moves</div>
+      </div>
+      <div style="text-align:center;flex:1">
+        <button class="btn-small" style="background:rgba(255,193,7,.2);color:#FFC107;border:1px solid rgba(255,193,7,.3);width:100%" onclick="addBot('medium')">Medium &#128993;</button>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Fair opponent</div>
+      </div>
+      <div style="text-align:center;flex:1">
+        <button class="btn-small" style="background:rgba(244,67,54,.2);color:#F44336;border:1px solid rgba(244,67,54,.3);width:100%" onclick="addBot('hard')">Hard &#128308;</button>
+        <div style="font-size:9px;color:var(--muted);margin-top:3px">Aggressive strategy</div>
+      </div>
     </div>
   </div>
   <button class="btn-primary" id="startBtn" onclick="startGame()" style="display:none">Start Game</button>
@@ -1205,7 +1227,7 @@ let newCardTimer = null;
 let heartbeatPongTimer = null;
 let myVote = null;
 let voteCountdown = null;
-let roomBots = new Set(); // Track bot player IDs
+let roomBots = new Map(); // Track bot player IDs → difficulty
 let disconnectTimestamps = {}; // Track when opponents disconnected
 
 // Track previous turn for animation triggers
@@ -1756,8 +1778,9 @@ function handleMessage(msg) {
       gameState = msg.payload.state;
       if (msg.payload.lastAction && msg.payload.lastAction.description) {
         const desc = msg.payload.lastAction.description;
+        const isBotAct = msg.payload.lastAction.isBotAction;
         addLog(desc);
-        showActionToast(desc);
+        showActionToast(desc, isBotAct ? 5000 : 2500);
         triggerActionAnimations(desc, msg.payload.lastAction);
         // Track newly drawn cards
         if (desc.toLowerCase().includes('drew')) {
@@ -1801,11 +1824,14 @@ function handleMessage(msg) {
       addLog(msg.payload.playerName + ' disconnected');
       break;
     case 'bot_added':
-      roomBots.add(msg.payload.id);
+      roomBots.set(msg.payload.id, msg.payload.difficulty || 'medium');
       toast(`${msg.payload.name} (Bot) joined`);
       break;
     case 'bot_removed':
       roomBots.delete(msg.payload.botId);
+      break;
+    case 'bot_thinking':
+      showBotThinking(msg.payload.botName);
       break;
     case 'error':
       toast(msg.payload.message || 'Error');
@@ -1863,7 +1889,7 @@ function startGame() {
 // ============================================================
 function renderLobby(room) {
   document.getElementById('lobbyCode').textContent = room.code;
-  if (room.bots) room.bots.forEach(id => roomBots.add(id));
+  if (room.bots) room.bots.forEach(id => roomBots.set(id, 'medium'));
   const ul = document.getElementById('lobbyPlayers');
   ul.innerHTML = '';
   room.players.forEach(p => {
@@ -1877,9 +1903,12 @@ function renderLobby(room) {
       li.appendChild(badge);
     }
     if (isBot) {
+      const diff = roomBots.get(p.id) || 'medium';
+      const diffColors = { easy: '#4CAF50', medium: '#FFC107', hard: '#F44336' };
+      const diffLabels = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
       const diffBadge = document.createElement('span');
-      diffBadge.style.cssText = 'font-size:10px;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:50px;margin-left:8px;color:var(--muted)';
-      diffBadge.textContent = 'BOT';
+      diffBadge.style.cssText = `font-size:10px;background:rgba(255,255,255,.08);padding:2px 8px;border-radius:50px;margin-left:8px;color:${diffColors[diff] || diffColors.medium};font-weight:700`;
+      diffBadge.textContent = diffLabels[diff] || 'Bot';
       li.appendChild(diffBadge);
       if (myPlayerId === room.hostId) {
         const rmBtn = document.createElement('span');
@@ -1926,6 +1955,7 @@ function renderGame() {
 
   // Opponents
   renderOpponents();
+  updateBotTurnBanner();
 
   // My properties
   renderMyProperties();
@@ -2167,6 +2197,9 @@ function renderOpponents() {
     const bankTopValue = (opp.bank && opp.bank.length > 0) ? Math.min(...opp.bank.map(c => c.bankValue)) : 0;
     const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
     const isBot = roomBots.has(opp.id) || opp.avatar >= 10;
+    const botDiff = roomBots.get(opp.id) || (isBot ? 'medium' : '');
+    const diffColorMap = { easy: '#4CAF50', medium: '#FFC107', hard: '#F44336' };
+    const diffLabel = botDiff ? ` <span style="font-size:9px;color:${diffColorMap[botDiff] || '#FFC107'};font-weight:700">(${botDiff[0].toUpperCase() + botDiff.slice(1)})</span>` : '';
     const botPrefix = isBot ? '&#129302; ' : '';
     let disconnectReplace = '';
     if (!opp.connected && !isBot && hostId === myPlayerId) {
@@ -2179,7 +2212,7 @@ function renderOpponents() {
       delete disconnectTimestamps[opp.id];
     }
     div.innerHTML = `
-      <div class="opp-name">${botPrefix}${esc(opp.name)}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
+      <div class="opp-name">${botPrefix}${esc(opp.name)}${diffLabel}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
       <div class="opp-stats">
         <span class="opp-hand">&#127183; ${opp.handCount} cards</span>
         <span class="opp-bank">&#128176; ${bankDisplay}</span>
@@ -3723,14 +3756,53 @@ function toast(msg) {
   setTimeout(() => el.classList.remove('active'), 3000);
 }
 
-function showActionToast(msg) {
+function showActionToast(msg, duration) {
   const el = document.getElementById('actionToast');
   if (!el) return;
   el.textContent = msg;
   el.classList.remove('active');
   void el.offsetWidth;
   el.classList.add('active');
-  setTimeout(() => el.classList.remove('active'), 3000);
+  setTimeout(() => el.classList.remove('active'), duration || 3000);
+}
+
+function showBotThinking(botName) {
+  showActionToast(`${botName} is thinking...`, 2000);
+}
+
+function updateBotTurnBanner() {
+  const banner = document.getElementById('botTurnBanner');
+  if (!banner || !gameState) { if (banner) banner.classList.remove('active'); return; }
+  const cp = gameState.opponents.find((_, i) => {
+    // Check if current player is a bot opponent
+    const totalP = gameState.opponents.length + 1;
+    let oi = 0;
+    for (let j = 0; j < totalP; j++) {
+      if (j === gameState.yourPlayerIndex) continue;
+      if (j === gameState.currentPlayerIndex && roomBots.has(gameState.opponents[oi]?.id)) return true;
+      oi++;
+    }
+    return false;
+  });
+  // Simpler check: is the current player index NOT our index, and is the current player a bot?
+  const isMyTurn = gameState.currentPlayerIndex === gameState.yourPlayerIndex;
+  const currentOpp = !isMyTurn && gameState.opponents.find(o => {
+    // Find opponent whose server index matches currentPlayerIndex
+    const totalP = gameState.opponents.length + 1;
+    let oi = 0;
+    for (let j = 0; j < totalP; j++) {
+      if (j === gameState.yourPlayerIndex) continue;
+      if (j === gameState.currentPlayerIndex) return gameState.opponents[oi]?.id === o.id;
+      oi++;
+    }
+    return false;
+  });
+  const isBotTurn = currentOpp && (roomBots.has(currentOpp.id) || currentOpp.avatar >= 10);
+  if (isBotTurn) {
+    banner.classList.add('active');
+  } else {
+    banner.classList.remove('active');
+  }
 }
 
 function copyRoomCode() {

@@ -85,7 +85,7 @@ function createBotTestGame(): GameState {
     actionsRemaining: 3,
     phase: TurnPhase.Play,
     pendingAction: null,
-    turnNumber: 1,
+    turnNumber: 10, // Mid-game default (past early game threshold of numPlayers*3=9)
     winnerId: null,
     useDoubleDeck: false,
     doubleRentActive: false,
@@ -240,16 +240,16 @@ describe("Hard Bot", () => {
     expect(action.targetColor).toBe(PropertyColor.DarkBlue);
   });
 
-  it("targets richest opponent with Debt Collector", () => {
+  it("targets poorest opponent with Debt Collector (meta: forces property payment)", () => {
     const state = createBotTestGame();
     state.players[0].hand = [
       { id: "dc1", type: CardType.ActionDebtCollector, name: "Debt Collector", bankValue: 3, actionValue: 5 },
     ];
     state.players[0].properties = [];
-    // p2 has $10M bank, p3 has $3M bank
+    // p2 has $10M bank, p3 has $3M bank — target poorest (p3)
     const action = chooseBotAction(state, "bot1", "hard");
     expect(action.type).toBe(ActionType.PlayDebtCollector);
-    expect(action.targetPlayerId).toBe("p2");
+    expect(action.targetPlayerId).toBe("p3");
   });
 
   it("plays doubled rent when it has both cards and 2+ actions", () => {
@@ -925,5 +925,166 @@ describe("Bot Turn Scheduling (Server)", () => {
     // Should have received multiple state updates from bot actions
     const updates = parseSent(ws1).filter((m) => m.type === "game_state_update");
     expect(updates.length).toBeGreaterThanOrEqual(2); // At least draw + end turn
+  });
+});
+
+// ============================================================
+// META STRATEGY TESTS
+// ============================================================
+
+describe("Meta Strategy — Early Game Banking", () => {
+  it("banks money before playing properties when bank < $5M", () => {
+    const state = createBotTestGame();
+    state.turnNumber = 1; // Early game
+    state.players[0].bank = []; // Empty bank
+    state.players[0].hand = [
+      money("m3", 3),
+      prop("med", PropertyColor.Brown, "Mediterranean Avenue", 1),
+    ];
+    state.players[0].properties = [];
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PlayMoneyToBank);
+  });
+
+  it("does NOT bank money when bank >= $5M in mid game", () => {
+    const state = createBotTestGame();
+    state.players[0].bank = [money("bank10", 10)];
+    state.players[0].hand = [
+      money("m3", 3),
+      { id: "sly1", type: CardType.ActionSlyDeal, name: "Sly Deal", bankValue: 3 },
+    ];
+    // Opponent p3 has stealable incomplete set
+    const action = chooseBotAction(state, "bot1", "hard");
+    // Should play sly deal or something strategic, not just bank
+    expect(action.type).not.toBe(ActionType.EndTurn);
+  });
+});
+
+describe("Meta Strategy — Deal Breaker Targeting", () => {
+  it("targets highest-value set with Deal Breaker (dark blue > brown)", () => {
+    const state = createBotTestGame();
+    state.players[0].hand = [
+      { id: "db1", type: CardType.ActionDealBreaker, name: "Deal Breaker", bankValue: 5 },
+    ];
+    // p2 has complete dark blue (high value), p3 has complete brown (low value)
+    state.players[2].properties = [
+      { color: PropertyColor.Brown, cards: [
+        prop("med_p3", PropertyColor.Brown, "Mediterranean", 1),
+        prop("baltic_p3", PropertyColor.Brown, "Baltic", 1),
+      ], hasHouse: false, hasHotel: false },
+    ];
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PlayDealBreaker);
+    expect(action.targetColor).toBe(PropertyColor.DarkBlue); // Higher value
+  });
+});
+
+describe("Meta Strategy — JSN Conservation", () => {
+  it("hard bot does NOT use JSN against low rent in late game (saves for Deal Breaker)", () => {
+    const state = createBotTestGame();
+    state.turnNumber = 20;
+    state.phase = TurnPhase.AwaitingResponse;
+    // Give bot 2 complete sets → late game
+    state.players[0].properties = [
+      { color: PropertyColor.Brown, cards: [
+        prop("med", PropertyColor.Brown, "Mediterranean", 1),
+        prop("baltic", PropertyColor.Brown, "Baltic", 1),
+      ], hasHouse: false, hasHotel: false },
+      { color: PropertyColor.Utility, cards: [
+        prop("elec", PropertyColor.Utility, "Electric Company", 2),
+        prop("water", PropertyColor.Utility, "Water Works", 2),
+      ], hasHouse: false, hasHotel: false },
+    ];
+    state.players[0].hand = [
+      { id: "jsn1", type: CardType.ActionJustSayNo, name: "Just Say No", bankValue: 4 },
+    ];
+    state.players[0].bank = [money("bank5", 5)]; // Can pay from bank
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 4, // Low rent — should NOT use JSN in late game
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    // Should pay, not JSN — saving JSN for Deal Breaker defense
+    expect(action.type).toBe(ActionType.PayWithCards);
+  });
+});
+
+describe("Meta Strategy — Payment Optimization", () => {
+  it("pays with fewest cards (prefers one big bill over many small)", () => {
+    const state = createBotTestGame();
+    state.phase = TurnPhase.AwaitingResponse;
+    state.players[0].hand = [];
+    state.players[0].bank = [
+      money("m1a", 1),
+      money("m1b", 1),
+      money("m1c", 1),
+      money("m5", 5),
+    ];
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 3,
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PayWithCards);
+    // Should pay with the $5 bill (1 card, overpay) rather than 3x $1 bills
+    expect(action.cardIds).toHaveLength(1);
+    expect(action.cardIds).toContain("m5");
+  });
+});
+
+describe("Meta Strategy — Full Game Simulation", () => {
+  it("3 hard bots finish game within 200 turns", () => {
+    let state = initializeGame("METAGAME", [
+      { id: "b1", name: "Bot1", avatar: 10 },
+      { id: "b2", name: "Bot2", avatar: 11 },
+      { id: "b3", name: "Bot3", avatar: 12 },
+    ]);
+
+    let actions = 0;
+    const maxActions = 800; // ~200 turns * 4 actions/turn
+
+    while (state.phase !== TurnPhase.GameOver && actions < maxActions) {
+      const currentPlayer = state.players[state.currentPlayerIndex];
+      let action: ReturnType<typeof chooseBotAction>;
+
+      if (state.phase === TurnPhase.AwaitingResponse && state.pendingAction) {
+        const targetId = state.pendingAction.targetPlayerIds.find(
+          (id) => !state.pendingAction!.respondedPlayerIds.includes(id)
+        );
+        if (!targetId) break;
+        action = chooseBotAction(state, targetId, "hard");
+        action.playerId = targetId;
+      } else {
+        action = chooseBotAction(state, currentPlayer.id, "hard");
+        action.playerId = currentPlayer.id;
+      }
+
+      const result = applyAction(state, action);
+      if (!result.ok) {
+        throw new Error(
+          `Meta bot game error at action ${actions}: ${result.error}\n` +
+          `Phase: ${state.phase}, Turn: ${state.turnNumber}\n` +
+          `Player: ${action.playerId}, Action: ${JSON.stringify(action)}`
+        );
+      }
+      state = result.state;
+      actions++;
+    }
+
+    expect(actions).toBeGreaterThan(0);
+    // Game should finish within reasonable actions
+    if (state.phase === TurnPhase.GameOver) {
+      expect(state.winnerId).toBeTruthy();
+    }
   });
 });

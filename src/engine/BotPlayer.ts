@@ -1,8 +1,9 @@
 // ============================================================
 // MONOPOLY DEAL ONLINE — Bot AI Player
 // ============================================================
-// Pure decision-making logic. No I/O, no side effects.
-// Takes a full GameState + botId + difficulty, returns a PlayerAction.
+// Meta strategy rewrite based on competitive Monopoly Deal play.
+// Phase-aware decision making: early banking, mid-game strategy,
+// late-game disruption. Pure logic — no I/O, no side effects.
 // ============================================================
 
 import {
@@ -37,6 +38,29 @@ import {
 } from "./helpers";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
+
+// Game phase for hard bot strategy
+type GamePhase = "early" | "mid" | "late";
+
+// Value ranking of complete sets (for Deal Breaker targeting)
+const SET_VALUE_RANK: Record<string, number> = {
+  [PropertyColor.DarkBlue]: 100,
+  [PropertyColor.Green]: 90,
+  [PropertyColor.Red]: 80,
+  [PropertyColor.Yellow]: 70,
+  [PropertyColor.Orange]: 60,
+  [PropertyColor.Pink]: 50,
+  [PropertyColor.Railroad]: 45,
+  [PropertyColor.LightBlue]: 40,
+  [PropertyColor.Brown]: 30,
+  [PropertyColor.Utility]: 20,
+};
+
+// Low-value colors safe to play in early game without bank protection
+const LOW_VALUE_COLORS = new Set([
+  PropertyColor.Brown,
+  PropertyColor.Utility,
+]);
 
 // Track wild cards swapped this turn to prevent infinite loops
 const swappedWildIds = new Set<string>();
@@ -90,7 +114,54 @@ export function chooseBotAction(
 }
 
 // ============================================================
-// EASY BOT — Random legal actions
+// PHASE DETECTION & THREAT SCORING
+// ============================================================
+
+function getGamePhase(
+  state: GameState,
+  bot: PlayerState,
+  opponents: PlayerState[]
+): GamePhase {
+  const botCompleteSets = countCompleteSets(bot);
+  const bankValue = totalBankValue(bot);
+  const numPlayers = state.players.length;
+
+  // Late game: bot has 2+ complete sets OR any opponent close to winning
+  if (botCompleteSets >= 2) return "late";
+  for (const opp of opponents) {
+    if (countCompleteSets(opp) >= 2) return "late";
+  }
+
+  // Early game: first 3 rounds OR bank < $5M
+  const earlyTurnThreshold = numPlayers * 3;
+  if (state.turnNumber <= earlyTurnThreshold || bankValue < 5) {
+    return "early";
+  }
+
+  return "mid";
+}
+
+function computeThreatScore(player: PlayerState): number {
+  const completeSets = countCompleteSets(player);
+  const nearCompleteSets = player.properties.filter((g) => {
+    const needed = SET_SIZE[g.color];
+    return g.cards.length === needed - 1 && !isSetComplete(g);
+  }).length;
+  const bankValue = totalBankValue(player);
+  return completeSets * 10 + nearCompleteSets * 5 + bankValue / 2;
+}
+
+function hasJSN(bot: PlayerState): boolean {
+  return bot.hand.some((c) => c.type === CardType.ActionJustSayNo);
+}
+
+function opponentMayHaveJSN(opp: PlayerState): boolean {
+  // If opponent has 4+ action cards in hand, assume they have JSN
+  return opp.hand.length >= 4;
+}
+
+// ============================================================
+// EASY BOT — Random legal actions with 50% bank bias
 // ============================================================
 
 function chooseEasyAction(state: GameState, bot: PlayerState): PlayerAction {
@@ -172,6 +243,18 @@ function chooseRandomPlayAction(
 ): PlayerAction {
   if (state.actionsRemaining <= 0) {
     return { type: ActionType.EndTurn, playerId: bot.id };
+  }
+
+  // 50% chance to bank money if available
+  if (Math.random() < 0.5) {
+    const moneyCard = bot.hand.find((c) => c.type === CardType.Money);
+    if (moneyCard) {
+      return {
+        type: ActionType.PlayMoneyToBank,
+        playerId: bot.id,
+        cardId: moneyCard.id,
+      };
+    }
   }
 
   const actions = enumerateLegalActions(state, bot);
@@ -424,7 +507,6 @@ function enumerateLegalActions(
 
     // JSN and DoubleRent can be banked
     if (card.type === CardType.ActionJustSayNo) {
-      // Can bank it
       actions.push({
         type: ActionType.PlayActionToBank,
         playerId: bot.id,
@@ -447,7 +529,7 @@ function enumerateLegalActions(
 }
 
 // ============================================================
-// HARD BOT — Full priority-based AI
+// HARD BOT — Phase-aware meta strategy
 // ============================================================
 
 function chooseHardPlayAction(
@@ -460,43 +542,108 @@ function chooseHardPlayAction(
 
   const opponents = state.players.filter((p) => p.id !== bot.id);
 
-  // Priority 0: If bank is empty and we have money cards, bank one first
-  // (ensures bot can always pay something when targeted)
-  if (totalBankValue(bot) === 0) {
-    const urgentBank = checkBankMoney(bot);
-    if (urgentBank) return urgentBank;
-  }
-
-  // Priority 1: Win check — play property to complete 3rd set
+  // UNIVERSAL: Win check always first — play property to complete 3rd set
   const winAction = checkWinPlay(bot);
   if (winAction) return winAction;
 
-  // Priority 2: House/Hotel on complete sets
+  const phase = getGamePhase(state, bot, opponents);
+
+  switch (phase) {
+    case "early":
+      return chooseEarlyGameAction(state, bot, opponents);
+    case "mid":
+      return chooseMidGameAction(state, bot, opponents);
+    case "late":
+      return chooseLateGameAction(state, bot, opponents);
+  }
+}
+
+// ---- PHASE 1: EARLY GAME ----
+// Bank first, protect yourself, avoid exposing completed sets
+
+function chooseEarlyGameAction(
+  state: GameState,
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction {
+  const bankValue = totalBankValue(bot);
+
+  // Priority 1: BANK FIRST — if bank < $5M, bank money before anything
+  if (bankValue < 5) {
+    const bankAction = checkBankMoney(bot);
+    if (bankAction) return bankAction;
+
+    // Bank action cards as money if not immediately useful
+    const bankActionCard = checkBankActionCardsEarly(bot, opponents);
+    if (bankActionCard) return bankActionCard;
+  }
+
+  // Priority 2: Pass Go (draw more cards early is always good)
+  if (bot.hand.length === 0) {
+    // Pass Go is highest value when hand is empty
+    const passGoAction = checkPassGo(bot);
+    if (passGoAction) return passGoAction;
+  }
+
+  // Priority 3: Play low-value properties (brown, utility) even with low bank
+  // Play any property if bank >= $5M, but AVOID completing sets in early game
+  const propertyAction = checkPlayPropertyEarlyGame(bot, bankValue);
+  if (propertyAction) return propertyAction;
+
+  // Priority 4: Pass Go (if not empty hand)
+  const passGoAction = checkPassGo(bot);
+  if (passGoAction) return passGoAction;
+
+  // Priority 5: Bank remaining money
+  const bankAction = checkBankMoney(bot);
+  if (bankAction) return bankAction;
+
+  // Priority 6: Bank unusable actions
+  const bankUnusable = checkBankUnusableActions(bot, opponents);
+  if (bankUnusable) return bankUnusable;
+
+  return { type: ActionType.EndTurn, playerId: bot.id };
+}
+
+// ---- PHASE 2: MID GAME ----
+// Strategic play, targeted disruption, set building with protection
+
+function chooseMidGameAction(
+  state: GameState,
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction {
+  // Priority 1: House/Hotel on complete sets (increases rent value)
   const houseHotelAction = checkHouseHotel(bot);
   if (houseHotelAction) return houseHotelAction;
 
-  // Priority 3: Deal Breaker on opponent complete sets
+  // Priority 2: Deal Breaker on most valuable complete set
   const dealBreakerAction = checkDealBreaker(bot, opponents);
   if (dealBreakerAction) return dealBreakerAction;
 
-  // Priority 4: Double Rent + Rent combo
+  // Priority 3: Double Rent + Rent combo on richest opponent
   const doubleRentAction = checkDoubleRentCombo(state, bot, opponents);
   if (doubleRentAction) return doubleRentAction;
 
-  // Priority 5: Rent (without double)
+  // Priority 4: Rent (without double)
   const rentAction = checkRent(bot, opponents);
   if (rentAction) return rentAction;
 
-  // Priority 6: Sly Deal
+  // Priority 5: Debt Collector — target POOREST (they must give properties)
+  const debtAction = checkDebtCollector(bot, opponents);
+  if (debtAction) return debtAction;
+
+  // Priority 6: Sly Deal to steal what completes YOUR set
   const slyDealAction = checkSlyDeal(bot, opponents);
   if (slyDealAction) return slyDealAction;
 
-  // Priority 7: Wild card swap
+  // Priority 7: Wild card swap to complete a set
   const wildSwapAction = checkWildCardSwap(bot);
   if (wildSwapAction) return wildSwapAction;
 
-  // Priority 8: Play property from hand
-  const propertyAction = checkPlayProperty(bot);
+  // Priority 8: Play property — near-complete sets, but avoid completing
+  //             3rd set without JSN defense
+  const propertyAction = checkPlayPropertyMidGame(state, bot);
   if (propertyAction) return propertyAction;
 
   // Priority 9: Forced Deal
@@ -511,23 +658,90 @@ function chooseHardPlayAction(
   const birthdayAction = checkBirthday(bot);
   if (birthdayAction) return birthdayAction;
 
-  // Priority 12: Debt Collector
-  const debtAction = checkDebtCollector(bot, opponents);
-  if (debtAction) return debtAction;
-
-  // Priority 13: Bank money (always bank if nothing better to do)
+  // Priority 12: Bank money
   const bankMoneyAction = checkBankMoney(bot);
   if (bankMoneyAction) return bankMoneyAction;
 
-  // Priority 14: Bank unusable action cards
+  // Priority 13: Bank unusable action cards
   const bankActionAction = checkBankUnusableActions(bot, opponents);
   if (bankActionAction) return bankActionAction;
 
-  // Priority 15: End turn
   return { type: ActionType.EndTurn, playerId: bot.id };
 }
 
-// ---- Priority 1: Win Check ----
+// ---- PHASE 3: LATE GAME ----
+// Aggressive disruption, win-or-deny strategy
+
+function chooseLateGameAction(
+  state: GameState,
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction {
+  // Priority 1: URGENT — If ANY opponent has 2+ complete sets, Deal Breaker NOW
+  const urgentDB = checkUrgentDealBreaker(bot, opponents);
+  if (urgentDB) return urgentDB;
+
+  // Priority 2: Deal Breaker on any complete set (disrupt leader)
+  const dealBreakerAction = checkDealBreaker(bot, opponents);
+  if (dealBreakerAction) return dealBreakerAction;
+
+  // Priority 3: Sly Deal bait — if we also have Deal Breaker, use Sly Deal
+  //             first to draw out opponent's JSN, then DB next action
+  const slyBait = checkSlyDealBait(state, bot, opponents);
+  if (slyBait) return slyBait;
+
+  // Priority 4: Double Rent combo
+  const doubleRentAction = checkDoubleRentCombo(state, bot, opponents);
+  if (doubleRentAction) return doubleRentAction;
+
+  // Priority 5: Rent
+  const rentAction = checkRent(bot, opponents);
+  if (rentAction) return rentAction;
+
+  // Priority 6: House/Hotel
+  const houseHotelAction = checkHouseHotel(bot);
+  if (houseHotelAction) return houseHotelAction;
+
+  // Priority 7: Sly Deal (normal, for set completion)
+  const slyDealAction = checkSlyDeal(bot, opponents);
+  if (slyDealAction) return slyDealAction;
+
+  // Priority 8: Play property — ONLY non-completing unless can win this turn
+  const propertyAction = checkPlayPropertyLateGame(state, bot);
+  if (propertyAction) return propertyAction;
+
+  // Priority 9: Wild card swap
+  const wildSwapAction = checkWildCardSwap(bot);
+  if (wildSwapAction) return wildSwapAction;
+
+  // Priority 10: Pass Go
+  const passGoAction = checkPassGo(bot);
+  if (passGoAction) return passGoAction;
+
+  // Priority 11: Birthday
+  const birthdayAction = checkBirthday(bot);
+  if (birthdayAction) return birthdayAction;
+
+  // Priority 12: Debt Collector (poorest)
+  const debtAction = checkDebtCollector(bot, opponents);
+  if (debtAction) return debtAction;
+
+  // Priority 13: Bank money
+  const bankMoneyAction = checkBankMoney(bot);
+  if (bankMoneyAction) return bankMoneyAction;
+
+  // Priority 14: Bank unusable
+  const bankActionAction = checkBankUnusableActions(bot, opponents);
+  if (bankActionAction) return bankActionAction;
+
+  return { type: ActionType.EndTurn, playerId: bot.id };
+}
+
+// ============================================================
+// CHECK FUNCTIONS — Individual action evaluators
+// ============================================================
+
+// ---- Win Check ----
 
 function checkWinPlay(bot: PlayerState): PlayerAction | null {
   const completeSets = countCompleteSets(bot);
@@ -564,7 +778,7 @@ function checkWinPlay(bot: PlayerState): PlayerAction | null {
   return null;
 }
 
-// ---- Priority 2: House/Hotel ----
+// ---- House/Hotel ----
 
 function checkHouseHotel(bot: PlayerState): PlayerAction | null {
   // Hotel first (higher value)
@@ -609,7 +823,8 @@ function checkHouseHotel(bot: PlayerState): PlayerAction | null {
   return null;
 }
 
-// ---- Priority 3: Deal Breaker ----
+// ---- Deal Breaker ----
+// Score by set value ranking; in late game, urgently target leaders
 
 function checkDealBreaker(
   bot: PlayerState,
@@ -621,12 +836,12 @@ function checkDealBreaker(
   let bestTarget: { oppId: string; color: PropertyColor; score: number } | null = null;
 
   for (const opp of opponents) {
-    const oppCompleteSets = countCompleteSets(opp);
+    const oppThreat = computeThreatScore(opp);
     for (const g of opp.properties) {
       if (!isSetComplete(g)) continue;
-      const rent = calculateRent(g, false);
-      // Prioritize: opponents closest to winning, then highest rent value
-      const score = oppCompleteSets * 100 + rent;
+      // Score: set value ranking + threat bonus
+      const setRank = SET_VALUE_RANK[g.color] || 0;
+      const score = setRank + oppThreat * 5;
       if (!bestTarget || score > bestTarget.score) {
         bestTarget = { oppId: opp.id, color: g.color, score };
       }
@@ -645,7 +860,45 @@ function checkDealBreaker(
   return null;
 }
 
-// ---- Priority 4: Double Rent + Rent Combo ----
+// ---- Urgent Deal Breaker (Late Game) ----
+// Specifically target opponents with 2+ complete sets
+
+function checkUrgentDealBreaker(
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction | null {
+  const dbCard = bot.hand.find((c) => c.type === CardType.ActionDealBreaker);
+  if (!dbCard) return null;
+
+  // Find opponents with 2+ complete sets — they're about to win
+  const urgentTargets: { oppId: string; color: PropertyColor; score: number }[] = [];
+
+  for (const opp of opponents) {
+    const oppCompleteSets = countCompleteSets(opp);
+    if (oppCompleteSets < 2) continue;
+
+    for (const g of opp.properties) {
+      if (!isSetComplete(g)) continue;
+      const setRank = SET_VALUE_RANK[g.color] || 0;
+      urgentTargets.push({ oppId: opp.id, color: g.color, score: setRank + oppCompleteSets * 50 });
+    }
+  }
+
+  if (urgentTargets.length > 0) {
+    urgentTargets.sort((a, b) => b.score - a.score);
+    const t = urgentTargets[0];
+    return {
+      type: ActionType.PlayDealBreaker,
+      playerId: bot.id,
+      cardId: dbCard.id,
+      targetPlayerId: t.oppId,
+      targetColor: t.color,
+    };
+  }
+  return null;
+}
+
+// ---- Double Rent + Rent Combo ----
 
 function checkDoubleRentCombo(
   state: GameState,
@@ -671,7 +924,7 @@ function checkDoubleRentCombo(
   };
 }
 
-// ---- Priority 5: Rent ----
+// ---- Rent ----
 
 function checkRent(
   bot: PlayerState,
@@ -700,7 +953,7 @@ function checkRent(
 function findBestRentCard(
   bot: PlayerState,
   opponents: PlayerState[]
-): { card: Card; targetColor: PropertyColor; targetPlayerId?: string } | null {
+): { card: Card; targetColor: PropertyColor; targetPlayerId?: string; rent: number } | null {
   let best: { card: Card; targetColor: PropertyColor; targetPlayerId?: string; rent: number } | null =
     null;
 
@@ -745,7 +998,8 @@ function findBestRentCard(
   return best;
 }
 
-// ---- Priority 6: Sly Deal ----
+// ---- Sly Deal ----
+// Prioritize stealing cards that complete YOUR sets
 
 function checkSlyDeal(
   bot: PlayerState,
@@ -761,13 +1015,13 @@ function checkSlyDeal(
   } | null = null;
 
   for (const opp of opponents) {
-    const oppThreat = countCompleteSets(opp); // Higher = more urgent to disrupt
+    const oppThreat = computeThreatScore(opp);
     for (const g of opp.properties) {
       if (isSetComplete(g)) continue;
       for (const card of g.cards) {
         let score = scoreSlyDealTarget(bot, card, g.color);
-        // Bonus for disrupting opponents closest to winning
-        score += oppThreat * 20;
+        // Bonus for disrupting high-threat opponents
+        score += oppThreat * 2;
         if (score > 0 && (!bestSteal || score > bestSteal.score)) {
           bestSteal = { oppId: opp.id, cardId: card.id, score };
         }
@@ -796,12 +1050,50 @@ function scoreSlyDealTarget(
   const currentCount = botGroup ? botGroup.cards.length : 0;
   const needed = SET_SIZE[color];
 
-  if (currentCount === needed - 1) return 100; // Completes set
+  if (currentCount === needed - 1) return 100; // Completes set!
   if (currentCount > 0) return 50 + currentCount * 10; // Advances existing
+  // Bonus for 2-card sets (easy to complete)
+  if (needed <= 2) return 25;
   return 10; // New color
 }
 
-// ---- Priority 7: Wild Card Swap ----
+// ---- Sly Deal Bait (Late Game) ----
+// Use Sly Deal to bait out opponent's JSN before playing Deal Breaker
+
+function checkSlyDealBait(
+  state: GameState,
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction | null {
+  // Only bait if we have both Sly Deal AND Deal Breaker AND 2+ actions
+  const slyCard = bot.hand.find((c) => c.type === CardType.ActionSlyDeal);
+  const dbCard = bot.hand.find((c) => c.type === CardType.ActionDealBreaker);
+  if (!slyCard || !dbCard || state.actionsRemaining < 2) return null;
+
+  // Find an opponent with a complete set (DB target) who also has
+  // incomplete sets (Sly Deal target) and might have JSN
+  for (const opp of opponents) {
+    const hasCompleteSet = opp.properties.some(isSetComplete);
+    if (!hasCompleteSet) continue;
+    if (!opponentMayHaveJSN(opp)) continue;
+
+    // Find a stealable card from their incomplete sets
+    for (const g of opp.properties) {
+      if (isSetComplete(g)) continue;
+      if (g.cards.length === 0) continue;
+      return {
+        type: ActionType.PlaySlyDeal,
+        playerId: bot.id,
+        cardId: slyCard.id,
+        targetPlayerId: opp.id,
+        targetCardId: g.cards[0].id,
+      };
+    }
+  }
+  return null;
+}
+
+// ---- Wild Card Swap ----
 
 function checkWildCardSwap(bot: PlayerState): PlayerAction | null {
   for (const group of bot.properties) {
@@ -841,30 +1133,41 @@ function checkWildCardSwap(bot: PlayerState): PlayerAction | null {
   return null;
 }
 
-// ---- Priority 8: Play Property ----
+// ---- Play Property (Early Game) ----
+// Only play low-value properties or any if bank >= $5M. Avoid completing sets.
 
-function checkPlayProperty(bot: PlayerState): PlayerAction | null {
+function checkPlayPropertyEarlyGame(
+  bot: PlayerState,
+  bankValue: number
+): PlayerAction | null {
   const propertyCards = bot.hand.filter(isPropertyCard);
   if (propertyCards.length === 0) return null;
 
+  // UNIVERSAL: hold wild cards as long as possible
+  const nonWildProperties = propertyCards.filter(
+    (c) => c.type !== CardType.PropertyWild && c.type !== CardType.PropertyWildAll
+  );
+
+  const candidates = nonWildProperties.length > 0 ? nonWildProperties : propertyCards;
+
   let bestPlay: { card: Card; color: PropertyColor; score: number } | null = null;
 
-  for (const card of propertyCards) {
+  for (const card of candidates) {
     const colors = getPlayableColors(card, bot);
     for (const color of colors) {
       const group = bot.properties.find((g) => g.color === color);
       const currentCount = group ? group.cards.length : 0;
       const needed = SET_SIZE[color];
 
-      // Score: how close to completion
-      const afterCount = currentCount + 1;
-      let score = (afterCount / needed) * 100;
+      // AVOID completing sets in early game — they become Deal Breaker targets
+      if (currentCount === needed - 1) continue;
 
-      // Bonus for completing a set
-      if (afterCount >= needed) score += 200;
+      // If bank < $5M, only play low-value colors
+      if (bankValue < 5 && !LOW_VALUE_COLORS.has(color)) continue;
 
-      // Bonus for advancing toward completion
-      score += (needed - (needed - afterCount)) * 10;
+      // Score: prefer 2-card sets (easy to complete later)
+      let score = needed <= 2 ? 50 : 20;
+      score += (currentCount + 1) / needed * 30;
 
       if (!bestPlay || score > bestPlay.score) {
         bestPlay = { card, color, score };
@@ -883,7 +1186,140 @@ function checkPlayProperty(bot: PlayerState): PlayerAction | null {
   return null;
 }
 
-// ---- Priority 9: Forced Deal ----
+// ---- Play Property (Mid Game) ----
+// Near-complete sets, but DON'T complete 3rd set without JSN defense
+
+function checkPlayPropertyMidGame(
+  state: GameState,
+  bot: PlayerState
+): PlayerAction | null {
+  const propertyCards = bot.hand.filter(isPropertyCard);
+  if (propertyCards.length === 0) return null;
+
+  // Hold wild cards unless they complete a winning set
+  const nonWildProperties = propertyCards.filter(
+    (c) => c.type !== CardType.PropertyWild && c.type !== CardType.PropertyWildAll
+  );
+
+  const candidates = nonWildProperties.length > 0 ? nonWildProperties : propertyCards;
+  const completeSets = countCompleteSets(bot);
+
+  let bestPlay: { card: Card; color: PropertyColor; score: number } | null = null;
+
+  for (const card of candidates) {
+    const colors = getPlayableColors(card, bot);
+    for (const color of colors) {
+      const group = bot.properties.find((g) => g.color === color);
+      const currentCount = group ? group.cards.length : 0;
+      const needed = SET_SIZE[color];
+
+      const afterCount = currentCount + 1;
+      let score = (afterCount / needed) * 100;
+
+      // Would this complete a set?
+      if (afterCount >= needed) {
+        // Would this be the 3rd complete set? Only complete if we have JSN defense
+        const wouldBeNew = !bot.properties.some(
+          (g) => g.color === color && isSetComplete(g)
+        );
+        if (wouldBeNew && completeSets + 1 >= 3) {
+          // This would win — already handled by checkWinPlay
+          score += 300;
+        } else if (wouldBeNew && completeSets + 1 >= 2 && !hasJSN(bot)) {
+          // Completing 2nd set without JSN — risky but acceptable
+          score += 100;
+        } else {
+          score += 200;
+        }
+      }
+
+      // Bonus for 2-card sets
+      if (needed <= 2) score += 30;
+
+      // Bonus for advancing toward completion
+      score += currentCount * 10;
+
+      if (!bestPlay || score > bestPlay.score) {
+        bestPlay = { card, color, score };
+      }
+    }
+  }
+
+  if (bestPlay) {
+    return {
+      type: ActionType.PlayPropertyCard,
+      playerId: bot.id,
+      cardId: bestPlay.card.id,
+      destinationColor: bestPlay.color,
+    };
+  }
+  return null;
+}
+
+// ---- Play Property (Late Game) ----
+// Play properties but be very careful about completing — only if can win this turn
+
+function checkPlayPropertyLateGame(
+  state: GameState,
+  bot: PlayerState
+): PlayerAction | null {
+  const propertyCards = bot.hand.filter(isPropertyCard);
+  if (propertyCards.length === 0) return null;
+
+  const completeSets = countCompleteSets(bot);
+
+  let bestPlay: { card: Card; color: PropertyColor; score: number } | null = null;
+
+  for (const card of propertyCards) {
+    const colors = getPlayableColors(card, bot);
+    for (const color of colors) {
+      const group = bot.properties.find((g) => g.color === color);
+      const currentCount = group ? group.cards.length : 0;
+      const needed = SET_SIZE[color];
+
+      const afterCount = currentCount + 1;
+
+      // Would this complete a set?
+      if (afterCount >= needed) {
+        const wouldBeNew = !bot.properties.some(
+          (g) => g.color === color && isSetComplete(g)
+        );
+        if (wouldBeNew && completeSets + 1 >= 3) {
+          // Winning play — already handled by checkWinPlay, but score high anyway
+          return {
+            type: ActionType.PlayPropertyCard,
+            playerId: bot.id,
+            cardId: card.id,
+            destinationColor: color,
+          };
+        }
+        // In late game, avoid completing non-winning sets (they get stolen)
+        continue;
+      }
+
+      // Non-completing play — score by proximity
+      let score = (afterCount / needed) * 100;
+      score += currentCount * 10;
+      if (needed <= 2) score += 30;
+
+      if (!bestPlay || score > bestPlay.score) {
+        bestPlay = { card, color, score };
+      }
+    }
+  }
+
+  if (bestPlay) {
+    return {
+      type: ActionType.PlayPropertyCard,
+      playerId: bot.id,
+      cardId: bestPlay.card.id,
+      destinationColor: bestPlay.color,
+    };
+  }
+  return null;
+}
+
+// ---- Forced Deal ----
 
 function checkForcedDeal(
   bot: PlayerState,
@@ -950,7 +1386,7 @@ function scoreMyPropertyValue(
   return (count / needed) * 50;
 }
 
-// ---- Priority 10: Pass Go ----
+// ---- Pass Go ----
 
 function checkPassGo(bot: PlayerState): PlayerAction | null {
   const card = bot.hand.find((c) => c.type === CardType.ActionPassGo);
@@ -962,7 +1398,7 @@ function checkPassGo(bot: PlayerState): PlayerAction | null {
   };
 }
 
-// ---- Priority 11: Birthday ----
+// ---- Birthday ----
 
 function checkBirthday(bot: PlayerState): PlayerAction | null {
   const card = bot.hand.find((c) => c.type === CardType.ActionItsMyBirthday);
@@ -974,7 +1410,8 @@ function checkBirthday(bot: PlayerState): PlayerAction | null {
   };
 }
 
-// ---- Priority 12: Debt Collector ----
+// ---- Debt Collector ----
+// META: Target POOREST opponent (lowest bank = must give properties)
 
 function checkDebtCollector(
   bot: PlayerState,
@@ -983,14 +1420,11 @@ function checkDebtCollector(
   const card = bot.hand.find((c) => c.type === CardType.ActionDebtCollector);
   if (!card) return null;
 
-  // Score opponents: prefer rich opponents with fewer cards (less JSN risk)
+  // Target the poorest opponent — they can't pay cash so they must give properties
   const target = opponents.reduce((a, b) => {
     const aBank = totalBankValue(a);
     const bBank = totalBankValue(b);
-    // Penalize high hand count (more likely to hold JSN)
-    const aScore = aBank + totalAssetsValue(a) - a.hand.length * 2;
-    const bScore = bBank + totalAssetsValue(b) - b.hand.length * 2;
-    return aScore >= bScore ? a : b;
+    return aBank <= bBank ? a : b;
   });
 
   return {
@@ -1001,7 +1435,7 @@ function checkDebtCollector(
   };
 }
 
-// ---- Priority 13: Bank Money ----
+// ---- Bank Money ----
 
 function checkBankMoney(bot: PlayerState): PlayerAction | null {
   const moneyCards = bot.hand
@@ -1018,7 +1452,59 @@ function checkBankMoney(bot: PlayerState): PlayerAction | null {
   return null;
 }
 
-// ---- Priority 14: Bank Unusable Actions ----
+// ---- Bank Action Cards (Early Game) ----
+// Bank action cards that aren't immediately useful as money
+
+function checkBankActionCardsEarly(
+  bot: PlayerState,
+  opponents: PlayerState[]
+): PlayerAction | null {
+  for (const card of bot.hand) {
+    if (!isActionCard(card) && card.type !== CardType.RentTwoColor && card.type !== CardType.RentWild)
+      continue;
+    if (card.type === CardType.ActionJustSayNo) continue; // Keep JSN
+    if (card.type === CardType.ActionPassGo) continue; // Pass Go is useful early
+
+    // Bank cards that don't have viable targets right now
+    let isUsable = false;
+
+    if (card.type === CardType.ActionSlyDeal) {
+      isUsable = opponents.some((opp) =>
+        opp.properties.some((g) => !isSetComplete(g) && g.cards.length > 0)
+      );
+    } else if (card.type === CardType.ActionDealBreaker) {
+      isUsable = opponents.some((opp) =>
+        opp.properties.some((g) => isSetComplete(g))
+      );
+    } else if (card.type === CardType.ActionDebtCollector) {
+      // In early game, bank Debt Collector — save it for mid game
+      isUsable = false;
+    } else if (card.type === CardType.ActionItsMyBirthday) {
+      // Birthday is low-value early, bank it
+      isUsable = false;
+    } else if (card.type === CardType.RentTwoColor && card.rentColors) {
+      isUsable = card.rentColors.some((c) => {
+        const g = bot.properties.find((pg) => pg.color === c);
+        return g && g.cards.length >= 2;
+      });
+    } else if (card.type === CardType.RentWild) {
+      isUsable = bot.properties.some((g) => g.cards.length >= 2);
+    } else {
+      continue;
+    }
+
+    if (!isUsable) {
+      return {
+        type: ActionType.PlayActionToBank,
+        playerId: bot.id,
+        cardId: card.id,
+      };
+    }
+  }
+  return null;
+}
+
+// ---- Bank Unusable Actions ----
 
 function checkBankUnusableActions(
   bot: PlayerState,
@@ -1092,7 +1578,7 @@ function checkBankUnusableActions(
 }
 
 // ============================================================
-// MEDIUM BOT — Same priorities but no opponent analysis
+// MEDIUM BOT — Banking-first strategy, simple targeting
 // ============================================================
 
 function chooseMediumPlayAction(
@@ -1105,21 +1591,21 @@ function chooseMediumPlayAction(
 
   const opponents = state.players.filter((p) => p.id !== bot.id);
 
-  // Priority 0: Bank money if bank is empty
-  if (totalBankValue(bot) === 0) {
+  // Phase 1 banking rule: always bank until $5M
+  if (totalBankValue(bot) < 5) {
     const urgentBank = checkBankMoney(bot);
     if (urgentBank) return urgentBank;
   }
 
-  // Priority 1: Win check
+  // Win check
   const winAction = checkWinPlay(bot);
   if (winAction) return winAction;
 
-  // Priority 2: House/Hotel
+  // House/Hotel
   const houseHotelAction = checkHouseHotel(bot);
   if (houseHotelAction) return houseHotelAction;
 
-  // Priority 3: Deal Breaker (random opponent with complete set)
+  // Deal Breaker (random opponent with complete set — not optimized)
   const dbCard = bot.hand.find((c) => c.type === CardType.ActionDealBreaker);
   if (dbCard) {
     const targets = opponents.flatMap((opp) =>
@@ -1139,9 +1625,7 @@ function chooseMediumPlayAction(
     }
   }
 
-  // Skip priority 4 (double rent combo) — medium doesn't do combos
-
-  // Priority 5: Rent (pick random valid target instead of optimal)
+  // Rent (pick random valid target instead of optimal)
   for (const card of bot.hand) {
     if (card.type === CardType.RentTwoColor && card.rentColors) {
       for (const color of card.rentColors) {
@@ -1171,7 +1655,7 @@ function chooseMediumPlayAction(
     }
   }
 
-  // Priority 6: Sly Deal (random valid target)
+  // Sly Deal (random valid target)
   const slyCard = bot.hand.find((c) => c.type === CardType.ActionSlyDeal);
   if (slyCard) {
     const targets: { oppId: string; cardId: string }[] = [];
@@ -1195,23 +1679,19 @@ function chooseMediumPlayAction(
     }
   }
 
-  // Skip priority 7 (wild card swap)
-
-  // Priority 8: Play property
-  const propertyAction = checkPlayProperty(bot);
+  // Play property
+  const propertyAction = checkPlayPropertyMidGame(state, bot);
   if (propertyAction) return propertyAction;
 
-  // Skip priority 9 (forced deal — too complex for medium)
-
-  // Priority 10: Pass Go
+  // Pass Go
   const passGoAction = checkPassGo(bot);
   if (passGoAction) return passGoAction;
 
-  // Priority 11: Birthday
+  // Birthday
   const birthdayAction = checkBirthday(bot);
   if (birthdayAction) return birthdayAction;
 
-  // Priority 12: Debt Collector (random target)
+  // Debt Collector (random target)
   const dcCard = bot.hand.find((c) => c.type === CardType.ActionDebtCollector);
   if (dcCard && opponents.length > 0) {
     const randOpp = opponents[Math.floor(Math.random() * opponents.length)];
@@ -1223,11 +1703,11 @@ function chooseMediumPlayAction(
     };
   }
 
-  // Priority 13: Bank money
+  // Bank money
   const bankMoneyAction = checkBankMoney(bot);
   if (bankMoneyAction) return bankMoneyAction;
 
-  // Priority 14: Bank unusable
+  // Bank unusable
   const bankAction = checkBankUnusableActions(bot, opponents);
   if (bankAction) return bankAction;
 
@@ -1257,7 +1737,7 @@ function chooseResponseAction(
   ].includes(pending.type);
 
   if (isPayment) {
-    return handlePaymentResponse(bot, pending, difficulty);
+    return handlePaymentResponse(state, bot, pending, difficulty);
   }
 
   if (pending.type === PendingActionType.RespondToSlyDeal) {
@@ -1276,36 +1756,51 @@ function chooseResponseAction(
 }
 
 function handlePaymentResponse(
+  state: GameState,
   bot: PlayerState,
   pending: any,
   difficulty: BotDifficulty
 ): PlayerAction {
   const amount = pending.amount || 0;
 
-  // Check if we should JSN
   if (difficulty === "hard") {
     const jsn = bot.hand.find((c) => c.type === CardType.ActionJustSayNo);
     if (jsn) {
-      // Use JSN if amount >= $5M
-      if (amount >= 5) {
-        return {
-          type: ActionType.PlayJustSayNo,
-          playerId: bot.id,
-          cardId: jsn.id,
-        };
-      }
-      // Also use JSN if paying would sacrifice near-complete set properties
-      if (totalBankValue(bot) < amount) {
-        const wouldLoseProperty = bot.properties.some((g) => {
-          const needed = SET_SIZE[g.color];
-          return g.cards.length >= needed - 1 && g.cards.length > 0;
-        });
-        if (wouldLoseProperty) {
+      const opponents = state.players.filter((p) => p.id !== bot.id);
+      const phase = getGamePhase(state, bot, opponents);
+
+      // Late game: save JSN for Deal Breaker defense only
+      if (phase === "late") {
+        // Only use JSN if paying would lose near-complete set properties AND amount is high
+        if (amount >= 8 && totalBankValue(bot) < amount) {
           return {
             type: ActionType.PlayJustSayNo,
             playerId: bot.id,
             cardId: jsn.id,
           };
+        }
+      } else {
+        // Mid/early game: use JSN if amount >= $5M
+        if (amount >= 5) {
+          return {
+            type: ActionType.PlayJustSayNo,
+            playerId: bot.id,
+            cardId: jsn.id,
+          };
+        }
+        // Also use JSN if paying would sacrifice near-complete set properties
+        if (totalBankValue(bot) < amount) {
+          const wouldLoseProperty = bot.properties.some((g) => {
+            const needed = SET_SIZE[g.color];
+            return g.cards.length >= needed - 1 && g.cards.length > 0;
+          });
+          if (wouldLoseProperty) {
+            return {
+              type: ActionType.PlayJustSayNo,
+              playerId: bot.id,
+              cardId: jsn.id,
+            };
+          }
         }
       }
     }
@@ -1346,10 +1841,10 @@ function handleForcedDealResponse(
   pending: any,
   difficulty: BotDifficulty
 ): PlayerAction {
-  if (difficulty === "hard" || difficulty === "medium") {
+  // Only hard uses JSN for forced deal (medium saves JSN for Deal Breaker only)
+  if (difficulty === "hard") {
     const jsn = bot.hand.find((c) => c.type === CardType.ActionJustSayNo);
     if (jsn && pending.requestedCardId) {
-      // Losing something we value > gaining what they offer
       for (const g of bot.properties) {
         const card = g.cards.find((c: Card) => c.id === pending.requestedCardId);
         if (card) {
@@ -1373,7 +1868,7 @@ function handleDealBreakerResponse(
   pending: any,
   difficulty: BotDifficulty
 ): PlayerAction {
-  // ALWAYS play JSN against Deal Breaker if available
+  // ALWAYS play JSN against Deal Breaker if available (all difficulties)
   const jsn = bot.hand.find((c) => c.type === CardType.ActionJustSayNo);
   if (jsn) {
     return {
@@ -1489,7 +1984,7 @@ function scoreCardForKeeping(bot: PlayerState, card: Card): number {
 }
 
 // ============================================================
-// PAYMENT — Select cards to pay with
+// PAYMENT — Optimized card selection (fewest cards, prefer overpayment)
 // ============================================================
 
 function buildPaymentAction(
@@ -1517,14 +2012,21 @@ function buildPaymentAction(
     return { type: ActionType.PayWithCards, playerId: bot.id, cardIds };
   }
 
-  // We CAN cover it — select optimally
+  // We CAN cover it — select optimally (fewest cards, prefer overpayment)
   const cardIds: string[] = [];
   let paid = 0;
 
-  // First: pay with bank cards, preferring lowest values
+  // Pay with bank cards first — sort: action cards first (dead money), then by value DESCENDING
+  // This minimizes the number of cards spent (one big bill > many small bills)
   const bankCards = [...bot.bank]
     .filter((c) => c.bankValue > 0)
-    .sort((a, b) => a.bankValue - b.bankValue);
+    .sort((a, b) => {
+      // Prefer action cards banked as money (they're "dead" anyway)
+      const aIsAction = a.type !== CardType.Money ? 1 : 0;
+      const bIsAction = b.type !== CardType.Money ? 1 : 0;
+      if (aIsAction !== bIsAction) return bIsAction - aIsAction;
+      return b.bankValue - a.bankValue; // highest value first
+    });
 
   for (const card of bankCards) {
     if (paid >= amount) break;

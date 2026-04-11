@@ -242,12 +242,12 @@ export class GameRoom {
         this.gameState.players[this.gameState.currentPlayerIndex];
 
       if (currentPlayer.id === playerId) {
-        // It's the disconnected player's turn — give them grace period
+        // It's the disconnected player's turn — give them grace period, then auto-replace
         this.clearTimers();
         const timer = setTimeout(() => {
           this.disconnectTimers.delete(playerId);
-          this.skippedPlayerIds.add(playerId);
-          this.autoEndTurn(playerId);
+          // Auto-replace with medium bot instead of just skipping
+          this.replacePlayerWithBot(playerId, "medium");
         }, RECONNECT_GRACE_MS);
         this.disconnectTimers.set(playerId, timer);
       }
@@ -307,8 +307,10 @@ export class GameRoom {
 
   replacePlayerWithBot(
     playerId: string,
-    difficulty: BotDifficulty
+    difficulty?: BotDifficulty
   ): { success: boolean; bot?: { id: string; name: string }; error?: string } {
+    const diff = difficulty || "medium"; // default to medium
+
     if (!this.gameState || this.status !== RoomStatus.Playing) {
       return { success: false, error: "No active game" };
     }
@@ -317,9 +319,11 @@ export class GameRoom {
     if (playerIdx === -1) return { success: false, error: "Player not found" };
 
     const player = this.players[playerIdx];
+    const originalName = player.name;
 
-    // Create bot with a unique name
-    const botInfo = this.botManager.createBot(difficulty);
+    // Create bot — inherit the player's name with "(Bot)" appended
+    const botInfo = this.botManager.createBot(diff);
+    botInfo.name = `${originalName} (Bot)`;
     this._hasBots = true;
 
     // Update ConnectedPlayer entry in-place (keep same array position)
@@ -365,7 +369,7 @@ export class GameRoom {
     this.cardsPlayedByPlayer.set(botInfo.id, played);
 
     this.clearTimers();
-    this.broadcastGameState(`${botInfo.name} (Bot) replaced a disconnected player`);
+    this.broadcastGameState(`${originalName} disconnected — replaced by ${diff} bot`);
 
     // Set up timers, then check if the bot should act
     this.setupTimersForCurrentState();
@@ -379,9 +383,29 @@ export class GameRoom {
     if (existing) clearTimeout(existing);
 
     const botName = this.botManager.getBotInfo(botId)?.name || botId;
-    const delay = 800 + Math.floor(Math.random() * 700); // 800-1500ms
+    const phase = this.gameState?.phase;
+
+    // Slower pacing for readability
+    let delay: number;
+    if (phase === TurnPhase.Draw) {
+      delay = 2000; // 2s for draw
+    } else if (phase === TurnPhase.Discard) {
+      delay = 2000;
+    } else {
+      delay = 3500 + Math.floor(Math.random() * 1000); // 3500-4500ms for play
+    }
+
+    // Send "bot_thinking" indicator 500ms before action
+    const thinkDelay = Math.max(delay - 500, 200);
+    const thinkTimer = setTimeout(() => {
+      this.broadcast(
+        serverMsg(ServerMessageType.BotThinking, { botId, botName })
+      );
+    }, thinkDelay);
+
     console.log(`[Bot] Scheduling turn for ${botName} in ${delay}ms`);
     const timer = setTimeout(() => {
+      clearTimeout(thinkTimer);
       this.botTimers.delete(botId);
       this.processBotTurn(botId);
     }, delay);
@@ -393,9 +417,18 @@ export class GameRoom {
     if (existing) clearTimeout(existing);
 
     const botName = this.botManager.getBotInfo(botId)?.name || botId;
-    const delay = 1000 + Math.floor(Math.random() * 500); // 1000-1500ms
+    const delay = 3000; // 3s for response
+
+    // Send thinking indicator 500ms before
+    const thinkTimer = setTimeout(() => {
+      this.broadcast(
+        serverMsg(ServerMessageType.BotThinking, { botId, botName })
+      );
+    }, Math.max(delay - 500, 200));
+
     console.log(`[Bot] Scheduling response for ${botName} in ${delay}ms`);
     const timer = setTimeout(() => {
+      clearTimeout(thinkTimer);
       this.botTimers.delete(botId);
       this.processBotResponse(botId);
     }, delay);
@@ -415,6 +448,19 @@ export class GameRoom {
     const action = this.botManager.getBotAction(this.gameState, botId, difficulty);
     console.log(`[Bot] ${botName} plays ${action.type}`);
 
+    // Extra 2000ms pause before ending turn so humans can read final state
+    if (action.type === ActionType.EndTurn) {
+      const endTimer = setTimeout(() => {
+        if (!this.gameState) return;
+        const result = this.processAction(action);
+        if (!result.success) {
+          this.processAction({ type: ActionType.EndTurn, playerId: botId });
+        }
+      }, 2000);
+      this.botTimers.set(`${botId}_end`, endTimer);
+      return;
+    }
+
     const result = this.processAction(action);
 
     if (!result.success) {
@@ -422,13 +468,6 @@ export class GameRoom {
       console.error(`[Bot] ${botName} error: ${result.error} — forcing EndTurn`);
       this.processAction({ type: ActionType.EndTurn, playerId: botId });
     }
-
-    // processAction calls setupTimersForCurrentState + checkBotSchedule,
-    // which will schedule the next bot action if the bot still needs to act.
-    // But if the turn advanced to a bot (Draw phase), we need an explicit check
-    // because checkBotSchedule runs inside processAction's success path.
-    // If processAction failed and we forced EndTurn, the forced EndTurn's
-    // processAction already handles it.
   }
 
   private processBotResponse(botId: string): void {
@@ -1119,13 +1158,20 @@ export class GameRoom {
   // ---- State Broadcasting ----
 
   private broadcastGameState(description: string): void {
+    // Detect if this action was taken by a bot
+    const isBotAction = this._hasBots && this.gameState
+      ? this.botManager.isBotPlayer(
+          this.gameState.players[this.gameState.currentPlayerIndex]?.id || ""
+        )
+      : false;
+
     for (const player of this.players) {
       if (player.ws?.readyState === WebSocket.OPEN) {
         const filteredState = this.filterStateForPlayer(player.id);
         player.ws.send(
           serverMsg(ServerMessageType.GameStateUpdate, {
             state: filteredState,
-            lastAction: { description },
+            lastAction: { description, isBotAction },
           })
         );
       }

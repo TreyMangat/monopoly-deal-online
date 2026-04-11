@@ -212,6 +212,7 @@ export enum ServerMessageType {
   Ping = "ping",
   BotAdded = "bot_added",
   BotRemoved = "bot_removed",
+  BotThinking = "bot_thinking",
 }
 
 export interface ServerMessage {
