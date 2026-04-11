@@ -28,8 +28,8 @@
 | Web client (HTML/CSS/JS) | 3,973 LOC (1 file) |
 | Swift (iOS client) | 5,939 LOC (31 files) |
 | **Total code** | **~19,800 LOC** |
-| Tests passing | 126 (5 test files) |
-| Test breakdown | 37 bot + 33 engine + 19 full-game + 17 server + 20 vote |
+| Tests passing | 133 (5 test files) |
+| Test breakdown | 44 bot + 33 engine + 19 full-game + 17 server + 20 vote |
 
 ---
 
@@ -172,6 +172,14 @@ Config:
 - [x] Replaced unsafe `!` non-null assertions with explicit null checks in payment/accept paths
 - [x] 11 win-path regression tests (wild cards, Deal Breaker, payment win, action 3/3, hand > 7, house/hotel, moveWild)
 - Full investigation details: `INVESTIGATION_ROOM_VANISH.md`
+
+### Sprint 10: Bot Intelligence + UX ✅
+- [x] Funny bot names with rotation pool (Bluebert, Garebear, Chingo, Osama, Mergatroid, Snorbax, Klaus, Pibbles, Tronk, Wuzzle)
+- [x] Color-coded property picker rows for Sly Deal, Forced Deal, Deal Breaker, House/Hotel modals
+- [x] Medium bot intelligence: never banks Deal Breaker, Sly Deal, Forced Deal, or JSN
+- [x] Bot payment optimization: minimum-overpayment algorithm (subset-sum for ≤15 cards, greedy with post-pruning for larger)
+- [x] Updated discard priority: Deal Breaker highest keep-score (45), Sly Deal (30), Forced Deal (28)
+- [x] 7 new bot tests (payment optimization, medium banking behavior)
 
 ---
 
