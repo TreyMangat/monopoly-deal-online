@@ -517,6 +517,16 @@ function handleClientMessage(
       break;
     }
 
+    case ClientMessageType.ChatMessage: {
+      const { roomCode: chatRoomCode, text } = payload;
+      const chatRoom = roomManager.getRoom(chatRoomCode);
+      if (!chatRoom) return;
+      const chatPlayer = chatRoom.players.find((p) => p.ws === ws);
+      if (!chatPlayer) return;
+      chatRoom.handleChatMessage(chatPlayer.id, text || "");
+      break;
+    }
+
     case ClientMessageType.Pong: {
       // Client responding to our ping — handled by ws 'pong' event
       break;

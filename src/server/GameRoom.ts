@@ -1242,6 +1242,49 @@ export class GameRoom {
     );
   }
 
+  // ---- Chat ----
+
+  private lastChatTime: Map<string, number> = new Map();
+
+  handleChatMessage(playerId: string, text: string): void {
+    const player = this.players.find((p) => p.id === playerId);
+    if (!player) return;
+
+    // Rate limit: 1 message per second per player
+    const now = Date.now();
+    const last = this.lastChatTime.get(playerId) || 0;
+    if (now - last < 1000) return;
+    this.lastChatTime.set(playerId, now);
+
+    // Sanitize: strip HTML, max 200 chars
+    const clean = text.replace(/<[^>]*>/g, "").trim().slice(0, 200);
+    if (!clean) return;
+
+    const playerName = this.gameState
+      ? this.gameState.players.find((p) => p.id === playerId)?.name || player.name
+      : player.name;
+
+    this.broadcast(
+      serverMsg(ServerMessageType.ChatMessage, {
+        playerName,
+        text: clean,
+        timestamp: now,
+        playerId,
+      })
+    );
+  }
+
+  clearChat(): void {
+    this.broadcast(
+      serverMsg(ServerMessageType.ChatMessage, {
+        playerName: "System",
+        text: "__clear__",
+        timestamp: Date.now(),
+        playerId: "system",
+      })
+    );
+  }
+
   private broadcast(msg: string): void {
     for (const player of this.players) {
       if (player.ws?.readyState === WebSocket.OPEN) {

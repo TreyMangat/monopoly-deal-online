@@ -3,7 +3,15 @@
 // ============================================================
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { initializeGame, applyAction } from "../engine/GameEngine";
+import { initializeGame as _initializeGame, applyAction } from "../engine/GameEngine";
+
+// Wrap initializeGame to always start with player 0 for deterministic tests
+function initializeGame(
+  roomCode: string,
+  players: { id: string; name: string; avatar: number }[]
+) {
+  return _initializeGame(roomCode, players, 0);
+}
 import {
   GameState,
   ActionType,

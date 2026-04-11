@@ -73,6 +73,12 @@ function setupGameRoom(): {
 
   room.startGame(p1Id);
 
+  // Fix starting player to player-1 for deterministic tests
+  if (room.gameState) {
+    room.gameState.currentPlayerIndex = 0;
+    room.gameState.phase = TurnPhase.Draw;
+  }
+
   // Draw cards for p1 to enter Play phase
   room.processAction({ type: ActionType.DrawCards, playerId: p1Id });
 
@@ -223,7 +229,7 @@ describe("Disconnect Handling", () => {
   });
 
   it("should wait reconnect grace period when current player disconnects", () => {
-    const { room, p1Id, p2Id } = setupGameRoom();
+    const { room, p1Id } = setupGameRoom();
 
     // Verify it's player 1's turn
     expect(
@@ -239,13 +245,13 @@ describe("Disconnect Handling", () => {
       room.gameState!.players[room.gameState!.currentPlayerIndex].id
     ).toBe(p1Id);
 
-    // Advance past grace period
+    // Advance past grace period — player 1 auto-replaced by bot
     vi.advanceTimersByTime(RECONNECT_GRACE_MS / 2 + 100);
 
-    // Turn should have advanced past player 1
-    expect(
-      room.gameState!.players[room.gameState!.currentPlayerIndex].id
-    ).toBe(p2Id);
+    // Player 1's slot should now be a bot (different ID)
+    const slotPlayer = room.gameState!.players[0];
+    expect(slotPlayer.id).not.toBe(p1Id);
+    expect(slotPlayer.name).toContain("(Bot)");
   });
 
   it("should resume normal play when disconnected player reconnects", () => {
@@ -274,37 +280,23 @@ describe("Disconnect Handling", () => {
     expect(room.gameState!.phase).not.toBe(TurnPhase.GameOver);
   });
 
-  it("should skip disconnected player on future turns after grace period expires", () => {
-    const { room, p1Id, p2Id } = setupGameRoom();
+  it("should auto-replace disconnected player with bot after grace period", () => {
+    const { room, p1Id } = setupGameRoom();
 
     // Player 1 disconnects
     room.handleDisconnect(p1Id);
 
-    // Grace period expires — player 1 is now skipped
+    // Grace period expires — player 1 auto-replaced by bot
     vi.advanceTimersByTime(RECONNECT_GRACE_MS + 100);
 
-    // Should be player 2's turn now
-    expect(
-      room.gameState!.players[room.gameState!.currentPlayerIndex].id
-    ).toBe(p2Id);
+    // Player 1's slot should now be a bot
+    const slotPlayer = room.gameState!.players[0];
+    expect(slotPlayer.id).not.toBe(p1Id);
+    expect(slotPlayer.name).toContain("(Bot)");
+    expect(slotPlayer.connected).toBe(true);
 
-    // Player 2 draws then ends turn
-    room.processAction({
-      type: ActionType.DrawCards,
-      playerId: p2Id,
-    });
-    room.processAction({
-      type: ActionType.EndTurn,
-      playerId: p2Id,
-    });
-
-    // Should skip player 1 and come back to player 2
-    // (need a tick for the setTimeout(0) skip to fire)
-    vi.advanceTimersByTime(10);
-
-    expect(
-      room.gameState!.players[room.gameState!.currentPlayerIndex].id
-    ).toBe(p2Id);
+    // Game should still be running (not stuck)
+    expect(room.gameState!.phase).not.toBe(TurnPhase.GameOver);
   });
 
   it("should auto-accept after 10 seconds when disconnected player is targeted", () => {

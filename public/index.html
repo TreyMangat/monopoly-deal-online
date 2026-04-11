@@ -580,7 +580,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
    PICKER MODAL — slide-up panel
    ============================================================ */
 #pickerModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,12,30,.6);
-  z-index:200;display:none;justify-content:flex-end;align-items:flex-end;flex-direction:column;
+  z-index:500;display:none;justify-content:flex-end;align-items:flex-end;flex-direction:column;
   opacity:0;transition:opacity .25s ease;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #pickerModal.active{display:flex;opacity:1}
 #pickerModal .modal{background:rgba(15,30,54,.95);border-radius:20px 20px 0 0;width:100%;max-height:70vh;
@@ -783,6 +783,35 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #botTurnBanner .btb-dots{display:inline-block;width:18px;text-align:left}
 @keyframes botDots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+
+/* Chat Panel */
+.chat-toggle{position:fixed;top:calc(10px + var(--safe-top));right:56px;z-index:180;
+  width:36px;height:36px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-border);
+  color:var(--muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.chat-toggle .chat-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;
+  border-radius:50%;background:#E94560;display:none}
+.chat-toggle .chat-dot.visible{display:block}
+#chatPanel{position:fixed;bottom:0;left:0;width:100%;height:55vh;z-index:400;
+  background:rgba(10,22,40,.97);border-top:1px solid var(--glass-border);
+  display:none;flex-direction:column;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+#chatPanel.active{display:flex;transform:translateY(0)}
+#chatPanel .chat-header{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+#chatPanel .chat-header h4{margin:0;font-size:14px;color:var(--gold);font-family:'Fredoka',sans-serif}
+#chatMessages{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.chat-msg{font-size:12px;color:var(--cream);line-height:1.4;word-break:break-word}
+.chat-msg .cm-name{font-weight:700;color:var(--teal);margin-right:6px}
+.chat-msg .cm-time{font-size:9px;color:var(--muted);margin-left:4px}
+#chatInput{display:flex;gap:8px;padding:8px 12px;padding-bottom:calc(8px + var(--safe-bottom,0px));
+  border-top:1px solid rgba(255,255,255,.06);flex-shrink:0}
+#chatInput input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:50px;padding:8px 14px;color:var(--cream);font-size:13px;outline:none}
+#chatInput input::placeholder{color:var(--muted)}
+#chatInput button{background:var(--teal);color:#fff;border:none;border-radius:50px;
+  padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer}
 #botTurnBanner .btb-dots::after{content:'';animation:botDots 1.2s steps(4,end) infinite}
 
 /* Connection Status */
@@ -999,6 +1028,20 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 <div id="toast"></div>
 <div id="actionToast"></div>
 <div id="botTurnBanner"><div class="btb-inner">&#129302; Bot Turn<span class="btb-dots"></span></div></div>
+
+<!-- Chat -->
+<button class="chat-toggle" id="chatToggle" onclick="toggleChat()" style="display:none">&#128172;<span class="chat-dot" id="chatDot"></span></button>
+<div id="chatPanel">
+  <div class="chat-header">
+    <h4>Chat</h4>
+    <button style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer" onclick="toggleChat()">&#10005;</button>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInput">
+    <input type="text" id="chatText" placeholder="Type a message..." maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+    <button onclick="sendChat()">Send</button>
+  </div>
+</div>
 
 <!-- ============ LANDING ============ -->
 <div id="landing" class="screen active">
@@ -1805,6 +1848,7 @@ function handleMessage(msg) {
       }
       renderGame();
       showScreen('game');
+      document.getElementById('chatToggle').style.display = '';
       break;
     }
     case 'action_rejected':
@@ -1832,6 +1876,9 @@ function handleMessage(msg) {
       break;
     case 'bot_thinking':
       showBotThinking(msg.payload.botName);
+      break;
+    case 'chat_message':
+      addChatMessage(msg.payload);
       break;
     case 'error':
       toast(msg.payload.message || 'Error');
@@ -2107,14 +2154,20 @@ function getDiscardBackground(card) {
     return `linear-gradient(135deg, ${COLOR_HEX[card.color]} 50%, ${COLOR_HEX[card.altColor]} 50%)`;
   if (t === 'property_wild_all') return 'linear-gradient(135deg,#DC143C,#FF8C00,#FFD700,#228B22,#00008B)';
   if (t === 'money') return 'linear-gradient(135deg,#1a7a3a,#0e5c28)';
-  if (t.startsWith('rent_')) return '#7D3C98';
+  if (t.startsWith('rent_')) return 'linear-gradient(135deg,#7D3C98,#6C3483)';
+  // Match hand card CSS gradients exactly
   if (t.startsWith('action_')) {
     const actionDiscardColors = {
-      action_pass_go:'#f5f5f5', action_debt_collector:'#1565C0',
-      action_its_my_birthday:'#E91E63', action_sly_deal:'#4FC3F7',
-      action_forced_deal:'#29B6F6', action_deal_breaker:'#4A148C',
-      action_just_say_no:'#2E7D32', action_double_rent:'#f5f5f5',
-      action_house:'#1976D2', action_hotel:'#388E3C'
+      action_pass_go:'#FFFFFF',
+      action_debt_collector:'linear-gradient(135deg,#1565C0,#0D47A1)',
+      action_its_my_birthday:'linear-gradient(135deg,#E91E63,#C2185B)',
+      action_sly_deal:'linear-gradient(135deg,#4FC3F7,#29B6F6)',
+      action_forced_deal:'linear-gradient(135deg,#29B6F6,#039BE5)',
+      action_deal_breaker:'linear-gradient(135deg,#4A148C,#38006b)',
+      action_just_say_no:'linear-gradient(135deg,#2E7D32,#1B5E20)',
+      action_double_rent:'#FFFFFF',
+      action_house:'linear-gradient(135deg,#1976D2,#1565C0)',
+      action_hotel:'linear-gradient(135deg,#388E3C,#2E7D32)'
     };
     return actionDiscardColors[t] || '#9B59B6';
   }
@@ -2124,7 +2177,8 @@ function getDiscardBackground(card) {
 function getDiscardTextColor(card) {
   const light = ['light_blue','yellow','utility'];
   if (card.type === 'property' && light.includes(card.color)) return '#222';
-  if (card.type === 'action_pass_go' || card.type === 'action_double_rent' || card.type === 'action_sly_deal') return '#222';
+  if (card.type === 'action_pass_go' || card.type === 'action_double_rent') return '#333';
+  if (card.type === 'action_sly_deal') return '#1a1a1a';
   return '#fff';
 }
 
@@ -2194,8 +2248,8 @@ function renderOpponents() {
     }
 
     const bankCount = opp.bank ? opp.bank.length : 0;
-    const bankTopValue = (opp.bank && opp.bank.length > 0) ? Math.min(...opp.bank.map(c => c.bankValue)) : 0;
-    const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
+    const bankFirstCard = (opp.bank && opp.bank.length > 0) ? opp.bank[0] : null;
+    const bankDisplay = bankFirstCard ? `${bankCount} card${bankCount !== 1 ? 's' : ''}` : '$0M';
     const isBot = roomBots.has(opp.id) || opp.avatar >= 10;
     const botDiff = roomBots.get(opp.id) || (isBot ? 'medium' : '');
     const diffColorMap = { easy: '#4CAF50', medium: '#FFC107', hard: '#F44336' };
@@ -2229,8 +2283,8 @@ function renderOpponents() {
 function showOppOverlay(opp) {
   const sheet = document.getElementById('oppOverlaySheet');
   const bankCount = opp.bank ? opp.bank.length : 0;
-  const bankTopValue = (opp.bank && opp.bank.length > 0) ? Math.min(...opp.bank.map(c => c.bankValue)) : 0;
-  const bankDisplay = bankCount > 0 ? `$${bankTopValue}M (${bankCount} card${bankCount !== 1 ? 's' : ''})` : '$0M';
+  const bankFirstCard = (opp.bank && opp.bank.length > 0) ? opp.bank[0] : null;
+  const bankDisplay = bankCount > 0 ? `${bankCount} card${bankCount !== 1 ? 's' : ''}` : '$0M';
 
   let propsHtml = '';
   if (opp.properties && opp.properties.length > 0) {
@@ -2262,7 +2316,7 @@ function showOppOverlay(opp) {
     </div>
     <div class="oo-bank-detail">
       <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px">Bank</div>
-      ${bankCount > 0 ? `<div style="color:var(--muted);font-size:13px">Low: $${bankTopValue}M &middot; ${bankCount} card${bankCount !== 1 ? 's' : ''} total</div>` : '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
+      ${bankCount > 0 ? `<div style="color:var(--muted);font-size:13px">${bankCount} card${bankCount !== 1 ? 's' : ''} in bank</div>` : '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
     </div>
     <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Properties</div>
     ${propsHtml}
@@ -2463,33 +2517,36 @@ function buildCardHTML(card) {
     `;
   }
 
-  // Property card — color bar + name
+  // Property card — color bar + name + rent tiers
   if (t === 'property') {
     const bg = COLOR_HEX[card.color] || '#666';
     const txtColor = isLightColor(card.color) ? '#222' : '#fff';
     const rents = RENT_TABLE[card.color];
-    const rentStr = rents ? `$${rents[rents.length-1]}M` : '';
+    const rentTier = rents ? rents.map((r, i) => `${i+1}:$${r}M`).join(' / ') : '';
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
       <div class="hc-color-bar" style="background:${bg};color:${txtColor}">${COLOR_LABELS[card.color] || ''}</div>
       <div class="hc-body">
         <div class="hc-name" style="color:#333">${esc(card.name)}</div>
-        ${rentStr ? `<div class="hc-desc" style="color:#666">Max rent: ${rentStr}</div>` : ''}
+        ${rentTier ? `<div class="hc-desc" style="color:#666;font-size:7px">${rentTier}</div>` : ''}
       </div>
       <div class="hc-footer">Property</div>
     `;
   }
 
-  // Wild property — split color bar
+  // Wild property — split color bar + rent for both colors
   if (t === 'property_wild') {
     const c1 = COLOR_HEX[card.color] || '#666';
     const c2 = COLOR_HEX[card.altColor] || '#666';
+    const r1 = RENT_TABLE[card.color]; const r2 = RENT_TABLE[card.altColor];
+    const rentInfo = (r1 ? r1.map((r, i) => `${i+1}:$${r}M`).join('/') : '') + ' | ' + (r2 ? r2.map((r, i) => `${i+1}:$${r}M`).join('/') : '');
     return `
       <div class="hc-badge">$${card.bankValue}M</div>
       <div class="hc-color-bar split" style="--color1:${c1};--color2:${c2}">WILD</div>
       <div class="hc-body">
         <div class="hc-name" style="color:#333">${esc(card.name)}</div>
         <div class="hc-desc" style="color:#666">${COLOR_LABELS[card.color]} / ${COLOR_LABELS[card.altColor]}</div>
+        <div class="hc-desc" style="color:#999;font-size:6px">${rentInfo}</div>
       </div>
       <div class="hc-footer">Wild Property</div>
     `;
@@ -3803,6 +3860,51 @@ function updateBotTurnBanner() {
   } else {
     banner.classList.remove('active');
   }
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+let chatMessages = [];
+let chatOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('active', chatOpen);
+  if (chatOpen) {
+    document.getElementById('chatDot').classList.remove('visible');
+    const el = document.getElementById('chatMessages');
+    el.scrollTop = el.scrollHeight;
+    document.getElementById('chatText').focus();
+  }
+}
+
+function sendChat() {
+  const input = document.getElementById('chatText');
+  const text = input.value.trim();
+  if (!text || !roomCode) return;
+  send('chat_message', { roomCode, text });
+  input.value = '';
+}
+
+function addChatMessage(msg) {
+  if (msg.text === '__clear__') { chatMessages = []; renderChatMessages(); return; }
+  chatMessages.push(msg);
+  if (chatMessages.length > 50) chatMessages.shift();
+  renderChatMessages();
+  if (!chatOpen) {
+    document.getElementById('chatDot').classList.add('visible');
+  }
+}
+
+function renderChatMessages() {
+  const el = document.getElementById('chatMessages');
+  el.innerHTML = chatMessages.map(m => {
+    const t = new Date(m.timestamp);
+    const time = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+    return `<div class="chat-msg"><span class="cm-name">${esc(m.playerName)}</span>${esc(m.text)}<span class="cm-time">${time}</span></div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
 }
 
 function copyRoomCode() {

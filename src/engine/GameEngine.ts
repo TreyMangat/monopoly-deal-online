@@ -61,7 +61,8 @@ export type EngineResult =
 
 export function initializeGame(
   roomCode: string,
-  players: { id: string; name: string; avatar: number }[]
+  players: { id: string; name: string; avatar: number }[],
+  startingPlayerIndex?: number
 ): GameState {
   const useDoubleDeck = players.length >= DOUBLE_DECK_THRESHOLD;
   const deck = shuffle(buildDeck(useDoubleDeck));
@@ -90,7 +91,7 @@ export function initializeGame(
     deck,
     discardPile: [],
     players: playerStates,
-    currentPlayerIndex: 0,
+    currentPlayerIndex: startingPlayerIndex ?? Math.floor(Math.random() * playerStates.length),
     actionsRemaining: MAX_PLAYS_PER_TURN,
     phase: TurnPhase.Draw,
     pendingAction: null,
@@ -225,6 +226,7 @@ function advanceTurn(state: GameState): void {
     (state.currentPlayerIndex + 1) % state.players.length;
   state.turnNumber++;
   state.phase = TurnPhase.Draw;
+  state.chargedThisTurn = {};
 }
 
 // ---- Play Actions ----
@@ -310,7 +312,7 @@ function playMoneyToBank(
   player.bank.push(card);
   consumePlay(state);
 
-  const desc = `${player.name} banked $${card.bankValue}M`;
+  const desc = `${player.name} added 1 card to bank`;
   checkAutoEndTurn(state);
 
   return { ok: true, state, description: desc };
@@ -333,7 +335,7 @@ function playActionToBank(
   player.bank.push(card);
   consumePlay(state);
 
-  const desc = `${player.name} banked ${card.name} as $${card.bankValue}M`;
+  const desc = `${player.name} added 1 card to bank`;
   checkAutoEndTurn(state);
 
   return { ok: true, state, description: desc };
@@ -452,9 +454,19 @@ function playDebtCollector(
     return { ok: false, error: "Invalid target player" };
   }
 
+  // Prevent targeting the same player with the same action type twice per turn
+  if (!state.chargedThisTurn) state.chargedThisTurn = {};
+  const chargeKey = "debt_collector";
+  if (state.chargedThisTurn[chargeKey]?.includes(target.id)) {
+    return { ok: false, error: "Already targeted this player with Debt Collector this turn" };
+  }
+
   removeCardFromHand(player, action.cardId);
   state.discardPile.push(card);
   consumePlay(state);
+
+  if (!state.chargedThisTurn[chargeKey]) state.chargedThisTurn[chargeKey] = [];
+  state.chargedThisTurn[chargeKey].push(target.id);
 
   state.pendingAction = {
     type: PendingActionType.PayDebtCollector,

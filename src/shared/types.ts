@@ -139,6 +139,7 @@ export interface GameState {
   winnerId: string | null;
   useDoubleDeck: boolean; // true for 6 players
   doubleRentActive: boolean; // set by Double Rent card, consumed by next rent play
+  chargedThisTurn?: Record<string, string[]>; // actionType → [targetPlayerId] — prevents double-targeting
 }
 
 // ---- Player Actions (client → server) ----
@@ -213,6 +214,7 @@ export enum ServerMessageType {
   BotAdded = "bot_added",
   BotRemoved = "bot_removed",
   BotThinking = "bot_thinking",
+  ChatMessage = "chat_message",
 }
 
 export interface ServerMessage {
@@ -262,6 +264,7 @@ export enum ClientMessageType {
   AddBot = "add_bot",
   RemoveBot = "remove_bot",
   ReplaceWithBot = "replace_with_bot",
+  ChatMessage = "chat_message",
 }
 
 export interface ClientMessage {

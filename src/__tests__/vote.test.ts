@@ -76,6 +76,11 @@ function setupGameRoom(playerCount = 2): {
 
   room.startGame("player-1");
 
+  // Fix starting player to player-1 for deterministic tests
+  if (room.gameState) {
+    room.gameState.currentPlayerIndex = 0;
+  }
+
   return { room, wsList, playerIds };
 }
 
