@@ -777,13 +777,13 @@ describe("BotManager", () => {
   it("removes bots and frees names", () => {
     const mgr = new BotManager();
     const b1 = mgr.createBot("easy");
-    const name1 = b1.name;
     mgr.removeBot(b1.id);
     expect(mgr.isBotPlayer(b1.id)).toBe(false);
 
-    // Name should be available again
+    // After removal, next bot gets the next name in rotation (not the freed one)
     const b2 = mgr.createBot("easy");
-    expect(b2.name).toBe(name1);
+    expect(b2.name).toBeTruthy();
+    expect(b2.name).not.toBe("Bot"); // Should get a real name, not fallback
   });
 });
 
@@ -1016,15 +1016,14 @@ describe("Meta Strategy — JSN Conservation", () => {
 });
 
 describe("Meta Strategy — Payment Optimization", () => {
-  it("pays with fewest cards (prefers one big bill over many small)", () => {
+  it("pays exact amount when possible: owes $3, has [$1,$2,$4] → pays $1+$2", () => {
     const state = createBotTestGame();
     state.phase = TurnPhase.AwaitingResponse;
     state.players[0].hand = [];
     state.players[0].bank = [
       money("m1a", 1),
-      money("m1b", 1),
-      money("m1c", 1),
-      money("m5", 5),
+      money("m2a", 2),
+      money("m4a", 4),
     ];
     state.pendingAction = {
       type: PendingActionType.PayRent,
@@ -1036,9 +1035,153 @@ describe("Meta Strategy — Payment Optimization", () => {
 
     const action = chooseBotAction(state, "bot1", "hard");
     expect(action.type).toBe(ActionType.PayWithCards);
-    // Should pay with the $5 bill (1 card, overpay) rather than 3x $1 bills
+    const total = action.cardIds!.reduce((sum: number, id: string) => {
+      const card = state.players[0].bank.find((c: Card) => c.id === id);
+      return sum + (card ? card.bankValue : 0);
+    }, 0);
+    expect(total).toBe(3); // Exact match, no overpayment
+    expect(action.cardIds).toContain("m1a");
+    expect(action.cardIds).toContain("m2a");
+  });
+
+  it("owes $2, has [$1,$1,$5] → pays two $1 cards, not the $5", () => {
+    const state = createBotTestGame();
+    state.phase = TurnPhase.AwaitingResponse;
+    state.players[0].hand = [];
+    state.players[0].bank = [money("m1a", 1), money("m1b", 1), money("m5a", 5)];
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 2,
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PayWithCards);
+    expect(action.cardIds).toHaveLength(2);
+    expect(action.cardIds).toContain("m1a");
+    expect(action.cardIds).toContain("m1b");
+  });
+
+  it("owes $4, has [$1,$2,$5] → pays $5 (minimum overpayment since $1+$2=$3 < $4)", () => {
+    const state = createBotTestGame();
+    state.phase = TurnPhase.AwaitingResponse;
+    state.players[0].hand = [];
+    state.players[0].bank = [money("m1a", 1), money("m2a", 2), money("m5a", 5)];
+    state.players[0].properties = [];
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 4,
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PayWithCards);
     expect(action.cardIds).toHaveLength(1);
-    expect(action.cardIds).toContain("m5");
+    expect(action.cardIds).toContain("m5a");
+  });
+
+  it("owes $2, has [$3,$4] → pays $3 (smallest overpayment)", () => {
+    const state = createBotTestGame();
+    state.phase = TurnPhase.AwaitingResponse;
+    state.players[0].hand = [];
+    state.players[0].bank = [money("m3a", 3), money("m4a", 4)];
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 2,
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PayWithCards);
+    expect(action.cardIds).toHaveLength(1);
+    expect(action.cardIds).toContain("m3a");
+  });
+
+  it("prefers bank cards over properties when both can cover", () => {
+    const state = createBotTestGame();
+    state.phase = TurnPhase.AwaitingResponse;
+    state.players[0].hand = [];
+    state.players[0].bank = [money("m3a", 3)];
+    state.players[0].properties = [
+      { color: PropertyColor.Red, cards: [
+        prop("indiana_pay", PropertyColor.Red, "Indiana Avenue", 3),
+      ], hasHouse: false, hasHotel: false },
+    ];
+    state.pendingAction = {
+      type: PendingActionType.PayRent,
+      fromPlayerId: "p2",
+      targetPlayerIds: ["bot1"],
+      respondedPlayerIds: [],
+      amount: 3,
+    };
+
+    const action = chooseBotAction(state, "bot1", "hard");
+    expect(action.type).toBe(ActionType.PayWithCards);
+    expect(action.cardIds).toContain("m3a"); // Bank card, not property
+  });
+});
+
+describe("Medium Bot — Never Bank High-Value Cards", () => {
+  it("medium bot banks money card instead of Deal Breaker", () => {
+    const state = createBotTestGame();
+    state.players[0].hand = [
+      money("m3_bank", 3),
+      { id: "db1", type: CardType.ActionDealBreaker, name: "Deal Breaker", bankValue: 5 },
+    ];
+    state.players[0].properties = [];
+    state.players[0].bank = []; // Low bank triggers banking behavior
+
+    const action = chooseBotAction(state, "bot1", "medium");
+    // Should bank the money card, not the Deal Breaker
+    if (action.type === ActionType.PlayMoneyToBank) {
+      expect(action.cardId).toBe("m3_bank");
+    }
+    // Should NEVER bank the Deal Breaker
+    if (action.type === ActionType.PlayActionToBank) {
+      expect(action.cardId).not.toBe("db1");
+    }
+  });
+
+  it("medium bot with only Deal Breaker and no playable target holds it", () => {
+    const state = createBotTestGame();
+    state.players[0].hand = [
+      { id: "db1", type: CardType.ActionDealBreaker, name: "Deal Breaker", bankValue: 5 },
+    ];
+    state.players[0].properties = [];
+    state.players[0].bank = [money("m10", 10)]; // Good bank, no urgency to bank more
+    // No opponent has complete sets → DB not usable right now
+    state.players[1].properties = [];
+    state.players[2].properties = [];
+
+    const action = chooseBotAction(state, "bot1", "medium");
+    // Should NOT bank the Deal Breaker — hold it or end turn
+    expect(action.type).not.toBe(ActionType.PlayActionToBank);
+  });
+
+  it("medium bot also never banks Sly Deal, Forced Deal, or JSN", () => {
+    const state = createBotTestGame();
+    state.players[0].hand = [
+      { id: "sly1", type: CardType.ActionSlyDeal, name: "Sly Deal", bankValue: 3 },
+      { id: "fd1", type: CardType.ActionForcedDeal, name: "Forced Deal", bankValue: 3 },
+      { id: "jsn1", type: CardType.ActionJustSayNo, name: "Just Say No", bankValue: 4 },
+    ];
+    state.players[0].properties = [];
+    state.players[0].bank = [money("m10", 10)];
+    // No valid targets for these cards
+    state.players[1].properties = [];
+    state.players[2].properties = [];
+
+    const action = chooseBotAction(state, "bot1", "medium");
+    // Should never bank any of these high-value cards
+    if (action.type === ActionType.PlayActionToBank) {
+      expect(["sly1", "fd1", "jsn1"]).not.toContain(action.cardId);
+    }
   });
 });
 

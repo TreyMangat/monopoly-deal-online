@@ -1462,21 +1462,13 @@ function checkBankActionCardsEarly(
   for (const card of bot.hand) {
     if (!isActionCard(card) && card.type !== CardType.RentTwoColor && card.type !== CardType.RentWild)
       continue;
-    if (card.type === CardType.ActionJustSayNo) continue; // Keep JSN
+    if (HIGH_VALUE_ACTIONS.has(card.type)) continue; // Never bank high-utility cards
     if (card.type === CardType.ActionPassGo) continue; // Pass Go is useful early
 
     // Bank cards that don't have viable targets right now
     let isUsable = false;
 
-    if (card.type === CardType.ActionSlyDeal) {
-      isUsable = opponents.some((opp) =>
-        opp.properties.some((g) => !isSetComplete(g) && g.cards.length > 0)
-      );
-    } else if (card.type === CardType.ActionDealBreaker) {
-      isUsable = opponents.some((opp) =>
-        opp.properties.some((g) => isSetComplete(g))
-      );
-    } else if (card.type === CardType.ActionDebtCollector) {
+    if (card.type === CardType.ActionDebtCollector) {
       // In early game, bank Debt Collector — save it for mid game
       isUsable = false;
     } else if (card.type === CardType.ActionItsMyBirthday) {
@@ -1506,6 +1498,14 @@ function checkBankActionCardsEarly(
 
 // ---- Bank Unusable Actions ----
 
+// High-utility action cards that medium/hard bots should never bank
+const HIGH_VALUE_ACTIONS = new Set([
+  CardType.ActionJustSayNo,
+  CardType.ActionDealBreaker,
+  CardType.ActionSlyDeal,
+  CardType.ActionForcedDeal,
+]);
+
 function checkBankUnusableActions(
   bot: PlayerState,
   opponents: PlayerState[]
@@ -1513,7 +1513,7 @@ function checkBankUnusableActions(
   for (const card of bot.hand) {
     if (!isActionCard(card) && card.type !== CardType.RentTwoColor && card.type !== CardType.RentWild)
       continue;
-    if (card.type === CardType.ActionJustSayNo) continue; // Keep JSN
+    if (HIGH_VALUE_ACTIONS.has(card.type)) continue; // Never bank high-utility cards
 
     let isUsable = false;
 
@@ -1973,8 +1973,10 @@ function scoreCardForKeeping(bot: PlayerState, card: Card): number {
     return bot.properties.some((g) => g.cards.length > 0) ? 40 : 5;
   }
 
+  if (card.type === CardType.ActionDealBreaker) return 45;
   if (card.type === CardType.ActionJustSayNo) return 35;
-  if (card.type === CardType.ActionDealBreaker) return 30;
+  if (card.type === CardType.ActionSlyDeal) return 30;
+  if (card.type === CardType.ActionForcedDeal) return 28;
   if (card.type === CardType.ActionPassGo) return 25;
   if (card.type === CardType.Money) return card.bankValue * 3;
   if (card.type === CardType.ActionDoubleRent) return 15;
@@ -1991,79 +1993,137 @@ function buildPaymentAction(
   bot: PlayerState,
   amount: number
 ): PlayerAction {
-  // Calculate total payable value (excluding PropertyWildAll which can't be used)
-  let totalPayable = 0;
-  for (const c of bot.bank) totalPayable += c.bankValue;
-  for (const g of bot.properties) {
-    for (const c of g.cards) {
-      if (c.type !== CardType.PropertyWildAll) totalPayable += c.bankValue;
-    }
+  // Gather all payable cards with metadata for priority
+  interface PayableCard {
+    id: string;
+    value: number;
+    priority: number; // lower = prefer to pay with (sacrifice first)
+    isProperty: boolean;
+    isWild: boolean;
   }
+  const payable: PayableCard[] = [];
 
-  // If we can't cover the full amount, pay EVERYTHING payable
-  if (totalPayable <= amount) {
-    const cardIds: string[] = [];
-    for (const c of bot.bank) cardIds.push(c.id);
-    for (const g of bot.properties) {
-      for (const c of g.cards) {
-        if (c.type !== CardType.PropertyWildAll) cardIds.push(c.id);
-      }
-    }
-    return { type: ActionType.PayWithCards, playerId: bot.id, cardIds };
-  }
-
-  // We CAN cover it — select optimally (fewest cards, prefer overpayment)
-  const cardIds: string[] = [];
-  let paid = 0;
-
-  // Pay with bank cards first — sort: action cards first (dead money), then by value DESCENDING
-  // This minimizes the number of cards spent (one big bill > many small bills)
-  const bankCards = [...bot.bank]
-    .filter((c) => c.bankValue > 0)
-    .sort((a, b) => {
-      // Prefer action cards banked as money (they're "dead" anyway)
-      const aIsAction = a.type !== CardType.Money ? 1 : 0;
-      const bIsAction = b.type !== CardType.Money ? 1 : 0;
-      if (aIsAction !== bIsAction) return bIsAction - aIsAction;
-      return b.bankValue - a.bankValue; // highest value first
+  // Bank cards — priority: action cards banked as money first (dead value), then money by value asc
+  for (const c of bot.bank) {
+    if (c.bankValue <= 0) continue;
+    const isAction = c.type !== CardType.Money;
+    payable.push({
+      id: c.id, value: c.bankValue,
+      priority: isAction ? 0 : 1, // prefer sacrificing banked action cards
+      isProperty: false, isWild: false,
     });
-
-  for (const card of bankCards) {
-    if (paid >= amount) break;
-    cardIds.push(card.id);
-    paid += card.bankValue;
   }
 
-  if (paid >= amount) {
-    return { type: ActionType.PayWithCards, playerId: bot.id, cardIds };
-  }
-
-  // Then: property cards from least valuable incomplete sets
-  const propertyCards: { id: string; value: number; setProgress: number }[] = [];
+  // Property cards — sorted by set progress (incomplete first), non-wild before wild
   for (const group of bot.properties) {
     const needed = SET_SIZE[group.color];
     const progress = group.cards.length / needed;
     const complete = isSetComplete(group);
-
     for (const card of group.cards) {
-      if (card.type === CardType.PropertyWildAll) continue;
-      propertyCards.push({
-        id: card.id,
-        value: card.bankValue,
-        setProgress: complete ? 999 : progress,
+      if (card.type === CardType.PropertyWildAll) continue; // can't pay with rainbow wild
+      const isWild = card.type === CardType.PropertyWild;
+      payable.push({
+        id: card.id, value: card.bankValue,
+        priority: complete ? 100 : (10 + progress * 10 + (isWild ? 5 : 0)),
+        isProperty: true, isWild,
       });
     }
   }
 
-  propertyCards.sort((a, b) => a.setProgress - b.setProgress || a.value - b.value);
+  // Calculate total payable
+  const totalPayable = payable.reduce((sum, c) => sum + c.value, 0);
 
-  for (const pc of propertyCards) {
-    if (paid >= amount) break;
-    cardIds.push(pc.id);
-    paid += pc.value;
+  // If we can't cover the full amount, pay EVERYTHING
+  if (totalPayable <= amount) {
+    return { type: ActionType.PayWithCards, playerId: bot.id, cardIds: payable.map((c) => c.id) };
   }
 
-  return { type: ActionType.PayWithCards, playerId: bot.id, cardIds };
+  // Sort by priority (sacrifice-first), then value ascending
+  payable.sort((a, b) => a.priority - b.priority || a.value - b.value);
+
+  // Minimum-overpayment selection:
+  // Try subset-sum for small card counts (≤15), fall back to greedy for larger
+  const selected = payable.length <= 15
+    ? findMinOverpaymentSubset(payable, amount)
+    : greedyMinOverpayment(payable, amount);
+
+  return { type: ActionType.PayWithCards, playerId: bot.id, cardIds: selected.map((c) => c.id) };
+}
+
+/** Find the subset with minimum overpayment that covers `amount`. */
+function findMinOverpaymentSubset(
+  cards: { id: string; value: number; priority: number }[],
+  amount: number
+): { id: string; value: number }[] {
+  const n = cards.length;
+  let bestSubset: number[] | null = null;
+  let bestTotal = Infinity;
+  let bestCardCount = Infinity;
+
+  // Bitmask enumeration — up to 2^15 = 32768 subsets
+  const limit = 1 << n;
+  for (let mask = 1; mask < limit; mask++) {
+    let total = 0;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        total += cards[i].value;
+        count++;
+      }
+    }
+    if (total < amount) continue;
+
+    // Prefer: lower overpayment, then fewer cards, then lower total priority
+    const overpay = total - amount;
+    const bestOverpay = bestTotal - amount;
+    if (
+      overpay < bestOverpay ||
+      (overpay === bestOverpay && count < bestCardCount)
+    ) {
+      bestTotal = total;
+      bestCardCount = count;
+      bestSubset = [];
+      for (let i = 0; i < n; i++) {
+        if (mask & (1 << i)) bestSubset.push(i);
+      }
+    }
+  }
+
+  if (bestSubset) {
+    return bestSubset.map((i) => cards[i]);
+  }
+
+  // Fallback: all cards
+  return cards;
+}
+
+/** Greedy minimum-overpayment: add lowest-value cards first, stop when covered. */
+function greedyMinOverpayment(
+  cards: { id: string; value: number; priority: number }[],
+  amount: number
+): { id: string; value: number }[] {
+  // Sort ascending by value within each priority tier
+  const sorted = [...cards].sort((a, b) => a.priority - b.priority || a.value - b.value);
+  const selected: { id: string; value: number }[] = [];
+  let paid = 0;
+
+  for (const card of sorted) {
+    if (paid >= amount) break;
+    selected.push(card);
+    paid += card.value;
+  }
+
+  // Post-processing: remove any card whose removal still covers the amount
+  // Iterate from highest value to lowest to remove unnecessary cards
+  for (let i = selected.length - 1; i >= 0; i--) {
+    const without = paid - selected[i].value;
+    if (without >= amount) {
+      paid = without;
+      selected.splice(i, 1);
+    }
+  }
+
+  return selected;
 }
 
 // ============================================================
