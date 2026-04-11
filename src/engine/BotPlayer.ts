@@ -36,6 +36,7 @@ import {
   isPropertyCard,
   findCardInProperties,
   getBestGroupForColor,
+  calculateMinimumPayment,
 } from "./helpers";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
@@ -631,7 +632,7 @@ function chooseMidGameAction(
   if (rentAction) return rentAction;
 
   // Priority 5: Debt Collector — target POOREST (they must give properties)
-  const debtAction = checkDebtCollector(bot, opponents);
+  const debtAction = checkDebtCollector(bot, opponents, state.chargedThisTurn);
   if (debtAction) return debtAction;
 
   // Priority 6: Sly Deal to steal what completes YOUR set
@@ -724,7 +725,7 @@ function chooseLateGameAction(
   if (birthdayAction) return birthdayAction;
 
   // Priority 12: Debt Collector (poorest)
-  const debtAction = checkDebtCollector(bot, opponents);
+  const debtAction = checkDebtCollector(bot, opponents, state.chargedThisTurn);
   if (debtAction) return debtAction;
 
   // Priority 13: Bank money
@@ -1419,13 +1420,19 @@ function checkBirthday(bot: PlayerState): PlayerAction | null {
 
 function checkDebtCollector(
   bot: PlayerState,
-  opponents: PlayerState[]
+  opponents: PlayerState[],
+  chargedThisTurn?: Record<string, string[]>
 ): PlayerAction | null {
   const card = bot.hand.find((c) => c.type === CardType.ActionDebtCollector);
   if (!card) return null;
 
-  // Target the poorest opponent — they can't pay cash so they must give properties
-  const target = opponents.reduce((a, b) => {
+  // Filter out opponents already targeted by Debt Collector this turn
+  const alreadyCharged = chargedThisTurn?.["debt_collector"] || [];
+  const eligible = opponents.filter((opp) => !alreadyCharged.includes(opp.id));
+  if (eligible.length === 0) return null;
+
+  // Target the poorest eligible opponent — they can't pay cash so they must give properties
+  const target = eligible.reduce((a, b) => {
     const aBank = totalBankValue(a);
     const bBank = totalBankValue(b);
     return aBank <= bBank ? a : b;
@@ -1698,13 +1705,17 @@ function chooseMediumPlayAction(
   // Debt Collector (random target)
   const dcCard = bot.hand.find((c) => c.type === CardType.ActionDebtCollector);
   if (dcCard && opponents.length > 0) {
-    const randOpp = opponents[Math.floor(Math.random() * opponents.length)];
-    return {
-      type: ActionType.PlayDebtCollector,
-      playerId: bot.id,
-      cardId: dcCard.id,
-      targetPlayerId: randOpp.id,
-    };
+    const alreadyCharged = state.chargedThisTurn?.["debt_collector"] || [];
+    const eligibleDc = opponents.filter((opp) => !alreadyCharged.includes(opp.id));
+    if (eligibleDc.length > 0) {
+      const randOpp = eligibleDc[Math.floor(Math.random() * eligibleDc.length)];
+      return {
+        type: ActionType.PlayDebtCollector,
+        playerId: bot.id,
+        cardId: dcCard.id,
+        targetPlayerId: randOpp.id,
+      };
+    }
   }
 
   // Bank money
@@ -1990,144 +2001,15 @@ function scoreCardForKeeping(bot: PlayerState, card: Card): number {
 }
 
 // ============================================================
-// PAYMENT — Optimized card selection (fewest cards, prefer overpayment)
+// PAYMENT — Uses shared minimum-overpayment algorithm from helpers.ts
 // ============================================================
 
 function buildPaymentAction(
   bot: PlayerState,
   amount: number
 ): PlayerAction {
-  // Gather all payable cards with metadata for priority
-  interface PayableCard {
-    id: string;
-    value: number;
-    priority: number; // lower = prefer to pay with (sacrifice first)
-    isProperty: boolean;
-    isWild: boolean;
-  }
-  const payable: PayableCard[] = [];
-
-  // Bank cards — priority: action cards banked as money first (dead value), then money by value asc
-  for (const c of bot.bank) {
-    if (c.bankValue <= 0) continue;
-    const isAction = c.type !== CardType.Money;
-    payable.push({
-      id: c.id, value: c.bankValue,
-      priority: isAction ? 0 : 1, // prefer sacrificing banked action cards
-      isProperty: false, isWild: false,
-    });
-  }
-
-  // Property cards — sorted by set progress (incomplete first), non-wild before wild
-  for (const group of bot.properties) {
-    const needed = SET_SIZE[group.color];
-    const progress = group.cards.length / needed;
-    const complete = isSetComplete(group);
-    for (const card of group.cards) {
-      if (card.type === CardType.PropertyWildAll) continue; // can't pay with rainbow wild
-      const isWild = card.type === CardType.PropertyWild;
-      payable.push({
-        id: card.id, value: card.bankValue,
-        priority: complete ? 100 : (10 + progress * 10 + (isWild ? 5 : 0)),
-        isProperty: true, isWild,
-      });
-    }
-  }
-
-  // Calculate total payable
-  const totalPayable = payable.reduce((sum, c) => sum + c.value, 0);
-
-  // If we can't cover the full amount, pay EVERYTHING
-  if (totalPayable <= amount) {
-    return { type: ActionType.PayWithCards, playerId: bot.id, cardIds: payable.map((c) => c.id) };
-  }
-
-  // Sort by priority (sacrifice-first), then value ascending
-  payable.sort((a, b) => a.priority - b.priority || a.value - b.value);
-
-  // Minimum-overpayment selection:
-  // Try subset-sum for small card counts (≤15), fall back to greedy for larger
-  const selected = payable.length <= 15
-    ? findMinOverpaymentSubset(payable, amount)
-    : greedyMinOverpayment(payable, amount);
-
-  return { type: ActionType.PayWithCards, playerId: bot.id, cardIds: selected.map((c) => c.id) };
-}
-
-/** Find the subset with minimum overpayment that covers `amount`. */
-function findMinOverpaymentSubset(
-  cards: { id: string; value: number; priority: number }[],
-  amount: number
-): { id: string; value: number }[] {
-  const n = cards.length;
-  let bestSubset: number[] | null = null;
-  let bestTotal = Infinity;
-  let bestCardCount = Infinity;
-
-  // Bitmask enumeration — up to 2^15 = 32768 subsets
-  const limit = 1 << n;
-  for (let mask = 1; mask < limit; mask++) {
-    let total = 0;
-    let count = 0;
-    for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) {
-        total += cards[i].value;
-        count++;
-      }
-    }
-    if (total < amount) continue;
-
-    // Prefer: lower overpayment, then fewer cards, then lower total priority
-    const overpay = total - amount;
-    const bestOverpay = bestTotal - amount;
-    if (
-      overpay < bestOverpay ||
-      (overpay === bestOverpay && count < bestCardCount)
-    ) {
-      bestTotal = total;
-      bestCardCount = count;
-      bestSubset = [];
-      for (let i = 0; i < n; i++) {
-        if (mask & (1 << i)) bestSubset.push(i);
-      }
-    }
-  }
-
-  if (bestSubset) {
-    return bestSubset.map((i) => cards[i]);
-  }
-
-  // Fallback: all cards
-  return cards;
-}
-
-/** Greedy minimum-overpayment: add lowest-value cards first, stop when covered. */
-function greedyMinOverpayment(
-  cards: { id: string; value: number; priority: number }[],
-  amount: number
-): { id: string; value: number }[] {
-  // Sort ascending by value within each priority tier
-  const sorted = [...cards].sort((a, b) => a.priority - b.priority || a.value - b.value);
-  const selected: { id: string; value: number }[] = [];
-  let paid = 0;
-
-  for (const card of sorted) {
-    if (paid >= amount) break;
-    selected.push(card);
-    paid += card.value;
-  }
-
-  // Post-processing: remove any card whose removal still covers the amount
-  // Iterate from highest value to lowest to remove unnecessary cards
-  for (let i = selected.length - 1; i >= 0; i--) {
-    const without = paid - selected[i].value;
-    if (without >= amount) {
-      paid = without;
-      selected.splice(i, 1);
-    }
-  }
-
-  return selected;
+  const cardIds = calculateMinimumPayment(bot, amount);
+  return { type: ActionType.PayWithCards, playerId: bot.id, cardIds };
 }
 
 // ============================================================

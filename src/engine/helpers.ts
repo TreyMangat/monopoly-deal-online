@@ -315,3 +315,118 @@ export function drawCards(state: GameState, count: number): Card[] {
   }
   return drawn;
 }
+
+// ---- Minimum-Overpayment Payment Calculator ----
+// Used by both bot AI and server auto-pay on timeout.
+
+export interface PayableCard {
+  id: string;
+  value: number;
+  priority: number; // lower = sacrifice first
+}
+
+/**
+ * Calculate the minimum set of cards to pay a debt.
+ * Returns card IDs that cover `amount` with minimum overpayment.
+ * Priority determines sacrifice order: lower priority = taken first.
+ */
+export function calculateMinimumPayment(
+  player: PlayerState,
+  amount: number
+): string[] {
+  const payable: PayableCard[] = [];
+
+  // Bank cards — priority 0 (action cards) and 1 (money), sacrifice first
+  for (const c of player.bank) {
+    if (c.bankValue <= 0) continue;
+    payable.push({
+      id: c.id, value: c.bankValue,
+      priority: c.type !== CardType.Money ? 0 : 1,
+    });
+  }
+
+  // Property cards — higher priority (sacrifice last), prefer incomplete sets
+  for (const group of player.properties) {
+    const needed = SET_SIZE[group.color];
+    const progress = group.cards.length / needed;
+    const complete = isSetComplete(group);
+    for (const card of group.cards) {
+      if (card.type === CardType.PropertyWildAll) continue; // can't pay with rainbow
+      const isWild = card.type === CardType.PropertyWild;
+      payable.push({
+        id: card.id, value: card.bankValue,
+        priority: complete ? 100 : (10 + progress * 10 + (isWild ? 5 : 0)),
+      });
+    }
+  }
+
+  const totalPayable = payable.reduce((sum, c) => sum + c.value, 0);
+
+  // Can't cover full amount — pay everything
+  if (totalPayable <= amount) {
+    return payable.map((c) => c.id);
+  }
+
+  // Sort by priority (sacrifice-first), then value ascending
+  payable.sort((a, b) => a.priority - b.priority || a.value - b.value);
+
+  // Subset-sum for small counts, greedy for larger
+  const selected = payable.length <= 15
+    ? findMinOverpaySubset(payable, amount)
+    : greedyMinOverpay(payable, amount);
+
+  return selected.map((c) => c.id);
+}
+
+function findMinOverpaySubset(
+  cards: PayableCard[],
+  amount: number
+): PayableCard[] {
+  const n = cards.length;
+  let bestSubset: number[] | null = null;
+  let bestTotal = Infinity;
+  let bestCount = Infinity;
+
+  const limit = 1 << n;
+  for (let mask = 1; mask < limit; mask++) {
+    let total = 0;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) { total += cards[i].value; count++; }
+    }
+    if (total < amount) continue;
+    const overpay = total - amount;
+    const bestOverpay = bestTotal - amount;
+    if (overpay < bestOverpay || (overpay === bestOverpay && count < bestCount)) {
+      bestTotal = total;
+      bestCount = count;
+      bestSubset = [];
+      for (let i = 0; i < n; i++) {
+        if (mask & (1 << i)) bestSubset.push(i);
+      }
+    }
+  }
+  return bestSubset ? bestSubset.map((i) => cards[i]) : cards;
+}
+
+function greedyMinOverpay(
+  cards: PayableCard[],
+  amount: number
+): PayableCard[] {
+  const sorted = [...cards].sort((a, b) => a.priority - b.priority || a.value - b.value);
+  const selected: PayableCard[] = [];
+  let paid = 0;
+  for (const card of sorted) {
+    if (paid >= amount) break;
+    selected.push(card);
+    paid += card.value;
+  }
+  // Remove unnecessary cards
+  for (let i = selected.length - 1; i >= 0; i--) {
+    if (paid - selected[i].value >= amount) {
+      paid -= selected[i].value;
+      selected.splice(i, 1);
+    }
+  }
+  return selected;
+}
