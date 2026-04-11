@@ -233,6 +233,18 @@ Config:
 - [x] Heartbeat/Resync message types added to ClientMessageType and ServerMessageType
 - [x] Full codebase sweep: 0 TODOs, 0 `as any` in prod, all logs tagged — see SWEEP_NOTES.md
 
+### Sprint 13: Migration to Fly.io ✅
+- [x] `fly.toml` — Fly.io config: sea region, shared-cpu-1x/512MB, always-on, /health check every 15s
+- [x] `.github/workflows/fly-deploy.yml` — auto-deploy on push to main (requires FLY_API_TOKEN secret)
+- [x] Service worker cache bumped v5 → v6 for PWA users
+- [x] Verified: web client uses `location.host` for WS URL — fully portable, no code changes needed
+- [x] Verified: /health endpoint already exists, manifest + SW use relative URLs
+- [x] `render.yaml` preserved as fallback — both platforms can coexist
+- [x] `MIGRATION_FLY.md` — step-by-step guide for Trey (install flyctl → deploy → auto-deploy → custom domain)
+- [x] Note: iOS Swift files have hardcoded Render URL as default — update when migrating (user-editable field)
+- **New URL (after migration)**: `https://monopoly-deal-online.fly.dev` (or chosen app name)
+- **Expected cost**: ~$2-3/month
+
 ## Current Sprint: Polish & Bug Fixes
 
 ### Outstanding Items
