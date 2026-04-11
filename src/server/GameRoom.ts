@@ -212,6 +212,10 @@ export class GameRoom {
     const player = this.players.find((p) => p.id === playerId);
     if (!player) return;
 
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Player "${player.name}" (${playerId}) disconnected — status=${this.status}`
+    );
+
     player.ws = null;
     player.disconnectedAt = Date.now();
 
@@ -524,6 +528,10 @@ export class GameRoom {
       }
     }
 
+    console.log(
+      `[ROOM:${this.code}] ${new Date().toISOString()} Game started — ${this.players.length} players`
+    );
+
     // Send initial state to all players
     this.broadcastGameState("Game started!");
 
@@ -555,7 +563,26 @@ export class GameRoom {
     const prevPlayerIndex = this.gameState.currentPlayerIndex;
     const prevPhase = this.gameState.phase;
 
-    const result = applyAction(this.gameState, action);
+    let result: { ok: boolean; state?: GameState; error?: string; description?: string };
+    try {
+      result = applyAction(this.gameState, action);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[ROOM:${this.code}] ${new Date().toISOString()} CRITICAL: applyAction threw for action ${action.type} by ${action.playerId}: ${msg}`
+      );
+      // Send error to acting player but do NOT crash the room
+      const player = this.players.find((p) => p.id === action.playerId);
+      if (player?.ws?.readyState === WebSocket.OPEN) {
+        player.ws.send(
+          serverMsg(ServerMessageType.Error, {
+            code: "ENGINE_ERROR",
+            message: "Server error processing action. Please try again.",
+          })
+        );
+      }
+      return { success: false, error: `Engine error: ${msg}` };
+    }
 
     if (!result.ok) {
       // Send rejection to the acting player only
@@ -572,7 +599,7 @@ export class GameRoom {
     }
 
     // Update the authoritative state
-    this.gameState = result.state;
+    this.gameState = result.state!;
 
     // Track card plays for early quit detection
     const playActions = [
@@ -591,21 +618,37 @@ export class GameRoom {
     // Clear existing timers — we'll set new ones based on new state
     this.clearTimers();
 
-    // Broadcast to all
-    this.broadcastGameState(result.description);
+    // Broadcast to all (wrapped in try/catch to protect room)
+    try {
+      this.broadcastGameState(result.description || "");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[ROOM:${this.code}] ${new Date().toISOString()} ERROR: broadcastGameState threw: ${msg}`
+      );
+    }
 
     // Check for game over
     if (this.gameState.phase === TurnPhase.GameOver) {
-      const winner = this.gameState.players.find(
-        (p) => p.id === this.gameState!.winnerId
-      );
-      this.broadcast(
-        serverMsg(ServerMessageType.GameOver, {
-          winnerId: this.gameState.winnerId,
-          winnerName: winner?.name || "Unknown",
-        })
-      );
-      this.startVote();
+      try {
+        const winner = this.gameState.players.find(
+          (p) => p.id === this.gameState!.winnerId
+        );
+        this.broadcast(
+          serverMsg(ServerMessageType.GameOver, {
+            winnerId: this.gameState.winnerId,
+            winnerName: winner?.name || "Unknown",
+          })
+        );
+        this.startVote();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[ROOM:${this.code}] ${new Date().toISOString()} ERROR: game-over broadcast/vote threw: ${msg}`
+        );
+        // Ensure room is at least in a stable state
+        this.status = RoomStatus.Finished;
+      }
       return { success: true };
     }
 
@@ -1208,6 +1251,8 @@ export class GameRoom {
         avatar: p.avatar,
         handCount: p.hand.length,
         bank: p.bank,
+        bankCount: p.bank.length,
+        frontBankValue: p.bank.length > 0 ? p.bank[0].bankValue : null,
         properties: p.properties,
         connected: p.connected,
       }));
@@ -1316,7 +1361,34 @@ export class GameRoom {
   }
 
   isEmpty(): boolean {
-    return this.players.every((p) => p.ws === null);
+    // Bots have ws === null but are active participants — don't count them
+    const humanPlayers = this.players.filter(
+      (p) => !this._hasBots || !this.botManager.isBotPlayer(p.id)
+    );
+    // Room is empty only if there are no human players or all humans are disconnected
+    return humanPlayers.length === 0 || humanPlayers.every((p) => p.ws === null);
+  }
+
+  /** Returns true if any player has an active reconnect grace timer */
+  hasActiveGraceTimers(): boolean {
+    return this.disconnectTimers.size > 0;
+  }
+
+  /** Returns true if room is in a protected state that should not be cleaned up */
+  isProtectedFromCleanup(): boolean {
+    // Playing rooms with active grace timers — players may reconnect
+    if (this.status === RoomStatus.Playing && this.hasActiveGraceTimers()) {
+      return true;
+    }
+    // Voting rooms get a 5-minute absolute protection
+    if (this.status === RoomStatus.Voting) {
+      return true;
+    }
+    // Playing rooms that still have connected players or active bots
+    if (this.status === RoomStatus.Playing && !this.isEmpty()) {
+      return true;
+    }
+    return false;
   }
 
   getPlayerBySessionToken(token: string): ConnectedPlayer | undefined {

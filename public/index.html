@@ -225,6 +225,11 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   scroll-snap-align:start;transition:transform .2s,border-color .3s,box-shadow .3s}
 .opp-card:active{transform:scale(.97)}
 .opp-card.is-turn{border-color:var(--gold);box-shadow:0 0 16px var(--gold-dim),inset 0 0 12px rgba(201,169,78,.05)}
+.opp-timer{display:inline-block;font-size:11px;font-weight:700;font-family:'Courier New',monospace;
+  color:var(--muted);margin-left:6px;min-width:24px;text-align:center}
+.opp-timer.warn{color:var(--warn);animation:timerPulse .5s ease-in-out infinite}
+.opp-timer.danger{color:var(--accent);animation:timerPulse .5s ease-in-out infinite}
+@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.5}}
 .opp-card .opp-name{font-weight:700;font-size:15px;margin-bottom:4px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;color:var(--cream)}
 .opp-card .opp-stats{display:flex;gap:12px;margin-bottom:6px}
@@ -299,12 +304,17 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .card-back:nth-child(3){top:0;left:0}
 .pile-label{font-size:11px;color:var(--muted);text-align:center}
 .draw-pile.draw-phase .draw-pile-stack{animation:drawPulse 1.5s ease-in-out infinite}
-.draw-pile.draw-phase .card-back:nth-child(3){border-color:var(--gold);
-  box-shadow:0 0 16px var(--gold-dim),0 0 30px rgba(201,169,78,.15)}
-.draw-pile.draw-phase .pile-label{color:var(--gold-bright);font-weight:700}
+.draw-pile.draw-phase .card-back:nth-child(3){border-color:var(--teal);
+  box-shadow:0 0 20px rgba(45,212,191,.4),0 0 40px rgba(45,212,191,.15),0 0 60px rgba(45,212,191,.08)}
+.draw-pile.draw-phase .pile-label{color:var(--teal);font-weight:700}
+.draw-pile.draw-phase .draw-arrow{display:block}
+.draw-arrow{display:none;position:absolute;top:-28px;left:50%;transform:translateX(-50%);
+  color:var(--teal);font-size:12px;font-weight:700;white-space:nowrap;
+  animation:drawArrowBob 1s ease-in-out infinite;text-shadow:0 1px 4px rgba(0,0,0,.4)}
+@keyframes drawArrowBob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-4px)}}
 @keyframes drawPulse{
   0%,100%{transform:scale(1)}
-  50%{transform:scale(1.05)}}
+  50%{transform:scale(1.08)}}
 
 /* Discard Pile */
 .discard-pile{display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -678,11 +688,11 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
    ============================================================ */
 
 /* Your-turn pulse — gold border */
-#game.your-turn .game-vignette{border:2px solid var(--gold);
-  animation:turnBorderPulse 2s ease-in-out infinite}
+#game.your-turn .game-vignette{border:3px solid var(--teal);
+  animation:turnBorderPulse 1.5s ease-in-out infinite}
 @keyframes turnBorderPulse{
-  0%,100%{border-color:rgba(201,169,78,.12);box-shadow:inset 0 0 12px rgba(201,169,78,.04)}
-  50%{border-color:rgba(201,169,78,.5);box-shadow:inset 0 0 24px rgba(201,169,78,.08)}}
+  0%,100%{border-color:rgba(45,212,191,.2);box-shadow:inset 0 0 20px rgba(45,212,191,.06)}
+  50%{border-color:rgba(45,212,191,.7);box-shadow:inset 0 0 40px rgba(45,212,191,.12)}}
 
 /* Targeted flash — red overlay */
 #targetedFlash{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(217,37,37,.2);
@@ -783,6 +793,16 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #botTurnBanner .btb-dots{display:inline-block;width:18px;text-align:left}
 @keyframes botDots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+
+/* Chat Toast Notification */
+#chatToast{position:fixed;top:calc(-70px);left:50%;transform:translateX(-50%);z-index:510;
+  background:rgba(19,78,74,.95);color:var(--cream);padding:10px 18px;border-radius:14px;
+  font-size:13px;max-width:85%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border:1px solid rgba(45,212,191,.3);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;
+  transition:top .4s cubic-bezier(.175,.885,.32,1.275)}
+#chatToast.active{top:calc(12px + var(--safe-top))}
+#chatToast .ct-sender{font-weight:700;color:var(--teal);margin-right:6px}
 
 /* Chat Panel */
 .chat-toggle{position:fixed;top:calc(10px + var(--safe-top));right:56px;z-index:180;
@@ -999,12 +1019,26 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 .vote-btns button.voted{opacity:.5;transform:scale(.97);pointer-events:none}
 .vote-btns button.my-vote{opacity:1;border:2px solid var(--gold-bright);transform:scale(1)}
 
+/* ---- Compact opponent mode (4+ opponents on mobile) ---- */
+@media(max-width:768px){
+  .opponents.compact .opp-card{min-width:130px;padding:8px 10px}
+  .opponents.compact .opp-name{font-size:12px;max-width:90px}
+  .opponents.compact .opp-stats{gap:8px;margin-bottom:2px}
+  .opponents.compact .opp-props{display:none}
+  .opponents.compact .opp-compact-props{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
+  .opp-compact-props{display:none}
+  .opp-props-pill{font-size:9px;color:var(--muted);background:rgba(255,255,255,.06);
+    padding:2px 6px;border-radius:8px;white-space:nowrap;font-weight:600}
+  .opp-sets-pill{font-size:10px;font-weight:700;color:var(--gold);margin-top:2px}
+}
+
 /* ---- Mobile-specific (small phones) ---- */
 @media(max-width:374px){
   .hand-card{min-width:62px;max-width:78px;min-height:96px}
   .hand-card .hc-name{font-size:9px}
   .hand-card .hc-badge{font-size:7px}
   .opp-card{min-width:160px;padding:8px}
+  .opponents.compact .opp-card{min-width:110px}
   .table-center{gap:16px;padding:12px 8px}
   .draw-pile-stack,.card-back{width:54px;height:76px}
   .discard-card{width:54px;height:76px}
@@ -1031,6 +1065,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
 
 <!-- Chat -->
 <button class="chat-toggle" id="chatToggle" onclick="toggleChat()" style="display:none">&#128172;<span class="chat-dot" id="chatDot"></span></button>
+<div id="chatToast" onclick="toggleChat()"></div>
 <div id="chatPanel">
   <div class="chat-header">
     <h4>Chat</h4>
@@ -1142,6 +1177,7 @@ input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 16px rgba(201,1
     <!-- Table Center: Draw & Discard Piles -->
     <div class="table-center" id="tableCenter">
       <div class="draw-pile" id="drawPile" onclick="clickDrawPile()">
+        <div class="draw-arrow">&#8595; Draw</div>
         <div class="draw-pile-stack">
           <div class="card-back"></div>
           <div class="card-back"></div>
@@ -1369,6 +1405,35 @@ function toggleMute() {
 let timerInterval = null;
 let timerEnd = 0;
 let timerDuration = 60;
+let oppTimerData = { playerId: null, seconds: 0 }; // track server-sent opponent timer
+let oppTimerInterval = null;
+
+function handleTimerUpdate(payload) {
+  const { playerId, secondsRemaining } = payload;
+  if (playerId === myPlayerId) return; // own timer handled locally
+  oppTimerData = { playerId, seconds: secondsRemaining };
+  // Start local countdown for smooth display
+  clearInterval(oppTimerInterval);
+  oppTimerInterval = setInterval(() => {
+    if (oppTimerData.seconds > 0) oppTimerData.seconds--;
+    updateOppTimerDisplay();
+    if (oppTimerData.seconds <= 0) clearInterval(oppTimerInterval);
+  }, 1000);
+  updateOppTimerDisplay();
+}
+
+function updateOppTimerDisplay() {
+  document.querySelectorAll('.opp-timer').forEach(el => {
+    const pid = el.dataset.playerId;
+    if (pid === oppTimerData.playerId && oppTimerData.seconds > 0) {
+      el.textContent = oppTimerData.seconds + 's';
+      el.className = 'opp-timer' + (oppTimerData.seconds <= 5 ? ' danger' : oppTimerData.seconds <= 10 ? ' warn' : '');
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
 
 function startTimer(seconds) {
   clearInterval(timerInterval);
@@ -1877,6 +1942,9 @@ function handleMessage(msg) {
     case 'bot_thinking':
       showBotThinking(msg.payload.botName);
       break;
+    case 'timer_update':
+      handleTimerUpdate(msg.payload);
+      break;
     case 'chat_message':
       addChatMessage(msg.payload);
       break;
@@ -2002,6 +2070,7 @@ function renderGame() {
 
   // Opponents
   renderOpponents();
+  updateOppTimerDisplay();
   updateBotTurnBanner();
 
   // My properties
@@ -2154,7 +2223,13 @@ function getDiscardBackground(card) {
     return `linear-gradient(135deg, ${COLOR_HEX[card.color]} 50%, ${COLOR_HEX[card.altColor]} 50%)`;
   if (t === 'property_wild_all') return 'linear-gradient(135deg,#DC143C,#FF8C00,#FFD700,#228B22,#00008B)';
   if (t === 'money') return 'linear-gradient(135deg,#1a7a3a,#0e5c28)';
-  if (t.startsWith('rent_')) return 'linear-gradient(135deg,#7D3C98,#6C3483)';
+  if (t === 'rent_two_color' && card.rentColors) {
+    const rc1 = COLOR_HEX[card.rentColors[0]] || '#C62828';
+    const rc2 = COLOR_HEX[card.rentColors[1]] || '#B71C1C';
+    return `linear-gradient(135deg, ${rc1} 50%, ${rc2} 50%)`;
+  }
+  if (t === 'rent_wild') return 'linear-gradient(135deg,#DC143C,#FF8C00,#228B22,#00008B)';
+  if (t.startsWith('rent_')) return 'linear-gradient(135deg,#C62828,#B71C1C)';
   // Match hand card CSS gradients exactly
   if (t.startsWith('action_')) {
     const actionDiscardColors = {
@@ -2198,6 +2273,9 @@ function clickDrawPile() {
 function renderOpponents() {
   const strip = document.getElementById('opponentsStrip');
   strip.innerHTML = '';
+  // Compact mode for 4+ opponents on mobile
+  const isCompact = gameState.opponents.length >= 4 && window.innerWidth <= 768;
+  strip.classList.toggle('compact', isCompact);
   const totalP = gameState.opponents.length + 1;
   const oppIndices = [];
   let oi = 0;
@@ -2247,9 +2325,11 @@ function renderOpponents() {
       propsHtml += '</div>';
     }
 
-    const bankCount = opp.bank ? opp.bank.length : 0;
-    const bankFirstCard = (opp.bank && opp.bank.length > 0) ? opp.bank[0] : null;
-    const bankDisplay = bankFirstCard ? `${bankCount} card${bankCount !== 1 ? 's' : ''}` : '$0M';
+    const bankCount = opp.bankCount ?? (opp.bank ? opp.bank.length : 0);
+    const frontVal = opp.frontBankValue;
+    const bankDisplay = bankCount > 0
+      ? (frontVal != null ? `$${frontVal}M \u00b7 ${bankCount}` : `${bankCount} card${bankCount !== 1 ? 's' : ''}`)
+      : '$0M';
     const isBot = roomBots.has(opp.id) || opp.avatar >= 10;
     const botDiff = roomBots.get(opp.id) || (isBot ? 'medium' : '');
     const diffColorMap = { easy: '#4CAF50', medium: '#FFC107', hard: '#F44336' };
@@ -2265,13 +2345,27 @@ function renderOpponents() {
     } else if (opp.connected && disconnectTimestamps[opp.id]) {
       delete disconnectTimestamps[opp.id];
     }
+    // Compact props summary for mobile 4+ player mode
+    const propCount = opp.properties ? opp.properties.reduce((s, g) => s + g.cards.length, 0) : 0;
+    const completeSets = opp.properties ? opp.properties.filter(g => g.cards.length >= (SET_SIZES[g.color] || 3)).length : 0;
+    const compactPropsHtml = `<div class="opp-compact-props">${
+      opp.properties && opp.properties.length > 0
+        ? opp.properties.map(g => {
+            const bg = COLOR_HEX[g.color] || '#666';
+            const n = SET_SIZES[g.color] || 3;
+            return `<span class="opp-props-pill" style="border-left:3px solid ${bg}">${g.cards.length}/${n}</span>`;
+          }).join('')
+        : '<span class="opp-props-pill">No props</span>'
+    }</div>`;
+
     div.innerHTML = `
-      <div class="opp-name">${botPrefix}${esc(opp.name)}${diffLabel}${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
+      <div class="opp-name">${botPrefix}${esc(opp.name)}${diffLabel}<span class="opp-timer" data-player-id="${opp.id}" style="display:none"></span>${!opp.connected ? ' <span style="color:var(--accent);font-size:10px">(offline)</span>' : ''}</div>
       <div class="opp-stats">
         <span class="opp-hand">&#127183; ${opp.handCount} cards</span>
         <span class="opp-bank">&#128176; ${bankDisplay}</span>
       </div>
       ${propsHtml}
+      ${compactPropsHtml}
       ${disconnectReplace}
     `;
     div.addEventListener('click', (e) => { e.stopPropagation(); showOppOverlay(opp); });
@@ -2282,9 +2376,11 @@ function renderOpponents() {
 // ---- Opponent Overlay ----
 function showOppOverlay(opp) {
   const sheet = document.getElementById('oppOverlaySheet');
-  const bankCount = opp.bank ? opp.bank.length : 0;
-  const bankFirstCard = (opp.bank && opp.bank.length > 0) ? opp.bank[0] : null;
-  const bankDisplay = bankCount > 0 ? `${bankCount} card${bankCount !== 1 ? 's' : ''}` : '$0M';
+  const bankCount = opp.bankCount ?? (opp.bank ? opp.bank.length : 0);
+  const frontVal = opp.frontBankValue;
+  const bankDisplay = bankCount > 0
+    ? (frontVal != null ? `$${frontVal}M \u00b7 ${bankCount} card${bankCount !== 1 ? 's' : ''}` : `${bankCount} card${bankCount !== 1 ? 's' : ''}`)
+    : '$0M';
 
   let propsHtml = '';
   if (opp.properties && opp.properties.length > 0) {
@@ -2316,7 +2412,7 @@ function showOppOverlay(opp) {
     </div>
     <div class="oo-bank-detail">
       <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px">Bank</div>
-      ${bankCount > 0 ? `<div style="color:var(--muted);font-size:13px">${bankCount} card${bankCount !== 1 ? 's' : ''} in bank</div>` : '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
+      ${bankCount > 0 ? `<div style="color:var(--muted);font-size:13px">${frontVal != null ? `Front: $${frontVal}M &middot; ` : ''}${bankCount} card${bankCount !== 1 ? 's' : ''} total</div>` : '<div style="color:var(--muted);font-style:italic;font-size:13px">Empty</div>'}
     </div>
     <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Properties</div>
     ${propsHtml}
@@ -3422,10 +3518,29 @@ function showStealModal(pa) {
     desc.textContent = `They want to steal your entire ${COLOR_LABELS[targetColor] || ''} set!`;
   }
 
+  // Board preview — show your sets and attacker's sets for context
+  const jsnCount = gameState.you.hand.filter(c => c.type === 'action_just_say_no').length;
+  const preview = document.createElement('div');
+  preview.style.cssText = 'margin:8px 0;padding:8px;background:rgba(255,255,255,.03);border-radius:10px;font-size:11px';
+  preview.innerHTML = `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <div style="flex:1;min-width:120px">
+        <div style="color:var(--gold);font-weight:700;font-size:10px;margin-bottom:4px">YOUR SETS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${buildSetThumbnails(gameState.you.properties)}</div>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div style="color:var(--muted);font-weight:700;font-size:10px;margin-bottom:4px">THEIR SETS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${buildSetThumbnails(attackerOpp ? attackerOpp.properties : [])}</div>
+      </div>
+    </div>
+    ${jsnCount > 0 ? `<div style="text-align:center;margin-top:6px;color:var(--teal);font-weight:700">&#9995; JSN in hand: ${jsnCount}</div>` : '<div style="text-align:center;margin-top:6px;color:var(--muted);font-size:10px">No JSN in hand</div>'}
+  `;
+  body.after(preview);
+
   // Buttons
   const btns = document.getElementById('stealButtons');
   btns.innerHTML = '';
-  const hasJSN = gameState.you.hand.some(c => c.type === 'action_just_say_no');
+  const hasJSN = jsnCount > 0;
   if (hasJSN) {
     const jsnBtn = document.createElement('button');
     jsnBtn.className = 'steal-btn-jsn';
@@ -3447,6 +3562,17 @@ function showStealModal(pa) {
   btns.appendChild(acceptBtn);
 
   modal.classList.add('active');
+}
+
+function buildSetThumbnails(properties) {
+  if (!properties || properties.length === 0) return '<span style="color:var(--muted);font-style:italic">None</span>';
+  return properties.map(g => {
+    const bg = COLOR_HEX[g.color] || '#666';
+    const needed = SET_SIZES[g.color] || 3;
+    const complete = g.cards.length >= needed;
+    const outline = complete ? 'outline:2px solid var(--gold);outline-offset:1px;' : '';
+    return `<div style="background:${bg};width:28px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;${outline}" title="${COLOR_LABELS[g.color]}: ${g.cards.length}/${needed}">${g.cards.length}/${needed}</div>`;
+  }).join('');
 }
 
 function closeStealModal() {
@@ -3887,13 +4013,23 @@ function sendChat() {
   input.value = '';
 }
 
+let chatToastTimer = null;
 function addChatMessage(msg) {
   if (msg.text === '__clear__') { chatMessages = []; renderChatMessages(); return; }
   chatMessages.push(msg);
   if (chatMessages.length > 50) chatMessages.shift();
   renderChatMessages();
-  if (!chatOpen) {
+  if (!chatOpen && msg.playerId !== myPlayerId) {
     document.getElementById('chatDot').classList.add('visible');
+    // Show toast notification
+    const ct = document.getElementById('chatToast');
+    const preview = msg.text.length > 60 ? msg.text.slice(0, 57) + '...' : msg.text;
+    ct.innerHTML = `&#128172; <span class="ct-sender">${esc(msg.playerName)}</span>${esc(preview)}`;
+    ct.classList.remove('active');
+    void ct.offsetWidth;
+    ct.classList.add('active');
+    if (chatToastTimer) clearTimeout(chatToastTimer);
+    chatToastTimer = setTimeout(() => ct.classList.remove('active'), 4000);
   }
 }
 

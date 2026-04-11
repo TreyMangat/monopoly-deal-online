@@ -245,6 +245,8 @@ export interface OpponentView {
   avatar: number;
   handCount: number; // only show count, not actual cards
   bank: Card[];
+  bankCount: number; // total cards in bank
+  frontBankValue: number | null; // value of oldest (first-in) bank card, visible to all
   properties: PropertyGroup[];
   connected: boolean;
 }

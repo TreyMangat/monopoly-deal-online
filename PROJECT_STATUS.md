@@ -144,6 +144,15 @@ Config:
 - [x] Dramatic steal modal with screen effects
 - [x] Payment received confirmation modal
 
+### Sprint 8: UX Polish ✅
+- [x] Opponent bank shows front card value ($XM) visible to all players
+- [x] Chat toast notification (teal popup with sender + preview, 4s dismiss, click to open)
+- [x] Discard pile colors unified with hand cards (rent cards show 2-color split, not purple)
+- [x] Opponent turn countdown timer (seconds display next to name, pulse under 10s, red under 5s)
+- [x] Board preview in steal/JSN modal (your sets + attacker sets + JSN count)
+- [x] Stronger your-turn indicator (teal glow on deck, floating arrow, thicker border pulse)
+- [x] Compact opponent bar for 4+ players on mobile (collapsed property pills, truncated names)
+
 ---
 
 ## Current Sprint: Polish & Bug Fixes
@@ -157,7 +166,7 @@ Config:
 - [ ] Host "clear chat" button (server handler exists, UI button not wired)
 
 ### Known Issues
-- 1 flaky test: "should not allow early quit after cards have been played" — depends on random card deal having a money card; passes in isolation, occasionally fails when run with other test files due to timer leaking
+- 1 flaky test: "should not allow early quit after cards have been played" — depends on random card deal; passes in isolation
 - Free tier cold starts (~30s first load)
 - No reconnect for chat history (new connection starts with empty chat)
 

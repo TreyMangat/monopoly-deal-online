@@ -46,7 +46,7 @@ export class RoomManager {
     this.rooms.set(code, room);
 
     console.log(
-      `[RoomManager] Room ${code} created by "${playerName}" (${playerId})`
+      `[ROOM:${code}] ${new Date().toISOString()} Room created by "${playerName}" (${playerId})`
     );
 
     return { room, playerId, sessionToken };
@@ -85,7 +85,7 @@ export class RoomManager {
     }
 
     console.log(
-      `[RoomManager] "${playerName}" (${playerId}) joined room ${roomCode}`
+      `[ROOM:${roomCode}] ${new Date().toISOString()} "${playerName}" (${playerId}) joined`
     );
 
     return { success: true, room, playerId, sessionToken };
@@ -110,7 +110,7 @@ export class RoomManager {
       return { success: false, error: "Reconnection failed" };
     }
 
-    console.log(`[RoomManager] Player ${playerId} reconnected to room ${roomCode}`);
+    console.log(`[ROOM:${roomCode}] ${new Date().toISOString()} Player ${playerId} reconnected`);
     return { success: true };
   }
 
@@ -124,7 +124,7 @@ export class RoomManager {
       if (player) {
         room.handleDisconnect(player.id);
         console.log(
-          `[RoomManager] Player ${player.id} disconnected from room ${code}`
+          `[ROOM:${code}] ${new Date().toISOString()} Player ${player.id} ("${player.name}") disconnected — status=${room.status}, remaining=${room.players.length}`
         );
 
         // Remove from waiting rooms entirely
@@ -132,7 +132,7 @@ export class RoomManager {
           room.removePlayer(player.id);
           if (room.isEmpty()) {
             this.rooms.delete(code);
-            console.log(`[RoomManager] Empty waiting room ${code} removed`);
+            console.log(`[ROOM:${code}] ${new Date().toISOString()} Empty waiting room removed`);
           }
         }
         break;
@@ -153,10 +153,26 @@ export class RoomManager {
   }
 
   private cleanup(): void {
+    const now = new Date().toISOString();
     for (const [code, room] of this.rooms) {
-      if (room.isExpired() || (room.isEmpty() && room.status !== "waiting")) {
+      // Never delete rooms that are in a protected state
+      if (room.isProtectedFromCleanup()) {
+        continue;
+      }
+
+      let reason = "";
+      if (room.isExpired()) {
+        reason = "expired (no activity for 30min)";
+      } else if (room.isEmpty() && room.status !== "waiting") {
+        reason = `empty with status "${room.status}"`;
+      }
+
+      if (reason) {
+        room.destroy();
         this.rooms.delete(code);
-        console.log(`[RoomManager] Cleaned up expired room ${code}`);
+        console.log(
+          `[ROOM:${code}] ${now} Room cleaned up — reason: ${reason}`
+        );
       }
     }
   }

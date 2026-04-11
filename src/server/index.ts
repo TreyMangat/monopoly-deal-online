@@ -546,25 +546,19 @@ function handleClientMessage(
 // ---- Start Server ----
 
 httpServer.listen(PORT, () => {
-  console.log(`
-╔═══════════════════════════════════════════╗
-║   🎴 MONOPOLY DEAL ONLINE SERVER         ║
-║   Running on port ${PORT}                    ║
-║   WebSocket: ws://localhost:${PORT}/ws       ║
-║   Health:    http://localhost:${PORT}/health  ║
-╚═══════════════════════════════════════════╝
-  `);
+  console.log(`[SERVER] ${new Date().toISOString()} Server started — PID=${process.pid} PORT=${PORT}`);
+  console.log(`[SERVER] WebSocket: ws://localhost:${PORT}/ws | Health: http://localhost:${PORT}/health`);
 });
 
 // ---- Graceful Shutdown ----
 
 function shutdown() {
-  console.log("\n[Server] Shutting down gracefully...");
+  console.log(`[SERVER] ${new Date().toISOString()} Shutting down gracefully — PID=${process.pid}`);
   clearInterval(pingInterval);
   roomManager.destroy();
   wss.close();
   httpServer.close(() => {
-    console.log("[Server] Goodbye!");
+    console.log(`[SERVER] ${new Date().toISOString()} Shutdown complete`);
     process.exit(0);
   });
 }
