@@ -547,3 +547,121 @@ describe("Room Lifecycle Hardening", () => {
     // but the room protection logic prevents cleanup during active games
   });
 });
+
+// ---- Reconnect / Session Resume Tests ----
+
+describe("Reconnect & Session Resume", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("player disconnects mid-turn → turn timer is paused", () => {
+    const { room, p1Id } = setupGameRoom();
+
+    // It's P1's turn in Play phase
+    expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(p1Id);
+    expect(room.gameState!.phase).toBe(TurnPhase.Play);
+
+    // Disconnect P1 (whose turn it is)
+    room.handleDisconnect(p1Id);
+
+    // Advance 60s (normal turn timer would fire) — turn should NOT auto-end
+    vi.advanceTimersByTime(TURN_TIMER_MS + 1000);
+
+    // P1 should still be current player (turn timer was cleared, grace timer running)
+    expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(p1Id);
+  });
+
+  it("player rejoins with valid sessionToken → restored to same seat with full state", () => {
+    const { room, ws1, p1Id } = setupGameRoom();
+
+    // Disconnect P1
+    room.handleDisconnect(p1Id);
+
+    // Rejoin with valid session
+    const newWs = createMockWs();
+    const result = room.reconnectPlayer(p1Id, newWs as WebSocket);
+    expect(result).toBe(true);
+
+    // Player should be reconnected — check that state was sent
+    const messages = parseSent(newWs as WebSocket & { _sent: string[] });
+    const stateUpdates = messages.filter((m) => m.type === ServerMessageType.GameStateUpdate);
+    expect(stateUpdates.length).toBeGreaterThanOrEqual(1);
+
+    // Player should still be in the game
+    const player = room.players.find((p) => p.id === p1Id);
+    expect(player).toBeDefined();
+    expect(player!.ws).toBe(newWs);
+    expect(player!.disconnectedAt).toBeNull();
+  });
+
+  it("player rejoin with mismatched session is rejected via RoomManager", () => {
+    const ws1 = createMockWs();
+    const ws2 = createMockWs();
+    const rm = new RoomManager();
+    const { room, playerId: p1Id } = rm.createRoom("Alice", 0, ws1 as WebSocket);
+    rm.joinRoom(room.code, "Bob", 1, ws2 as WebSocket);
+
+    // Try reconnecting with wrong session token
+    const newWs = createMockWs();
+    const result = rm.reconnect(room.code, p1Id, "wrong-token", newWs as WebSocket);
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe("PLAYER_NOT_IN_ROOM");
+
+    rm.destroy();
+  });
+
+  it("rejoin attempt on nonexistent room → returns ROOM_EXPIRED", () => {
+    const rm = new RoomManager();
+    const newWs = createMockWs();
+    const result = rm.reconnect("FAKECODE", "fake-id", "fake-token", newWs as WebSocket);
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe("ROOM_EXPIRED");
+    rm.destroy();
+  });
+
+  it("multiple rapid disconnect/reconnect cycles → no state corruption", () => {
+    const { room, p1Id } = setupGameRoom();
+
+    for (let i = 0; i < 5; i++) {
+      room.handleDisconnect(p1Id);
+      const newWs = createMockWs();
+      room.reconnectPlayer(p1Id, newWs as WebSocket);
+    }
+
+    // Room should still be functional
+    expect(room.gameState).not.toBeNull();
+    expect(room.status).toBe(RoomStatus.Playing);
+    const player = room.players.find((p) => p.id === p1Id);
+    expect(player!.disconnectedAt).toBeNull();
+    expect(player!.ws).not.toBeNull();
+  });
+
+  it("disconnected player's turn doesn't auto-advance during grace period", () => {
+    const { room, p1Id, p2Id } = setupGameRoom();
+
+    // It's P1's turn
+    expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(p1Id);
+
+    // Disconnect P1
+    room.handleDisconnect(p1Id);
+
+    // Advance 90s (within 120s grace period)
+    vi.advanceTimersByTime(90 * 1000);
+
+    // Still P1's turn — not auto-advanced
+    expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(p1Id);
+
+    // Reconnect P1
+    const newWs = createMockWs();
+    room.reconnectPlayer(p1Id, newWs as WebSocket);
+
+    // P1 should be able to continue their turn
+    expect(room.gameState!.players[room.gameState!.currentPlayerIndex].id).toBe(p1Id);
+    expect(room.gameState!.phase).toBe(TurnPhase.Play);
+  });
+});
