@@ -129,16 +129,16 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 const roomManager = new RoomManager();
 
-// Track alive status for ping/pong
-const aliveSockets = new WeakMap<WebSocket, boolean>();
+// Track alive status for ping/pong — require 2 missed pongs before termination
+const missedPongs = new WeakMap<WebSocket, number>();
 
 wss.on("connection", (ws: WebSocket) => {
-  aliveSockets.set(ws, true);
+  missedPongs.set(ws, 0);
 
   console.log(`[WS] New connection (total: ${wss.clients.size})`);
 
   ws.on("pong", () => {
-    aliveSockets.set(ws, true);
+    missedPongs.set(ws, 0);
   });
 
   ws.on("message", (data) => {
@@ -184,12 +184,13 @@ wss.on("connection", (ws: WebSocket) => {
 
 const pingInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (aliveSockets.get(ws) === false) {
-      console.log("[WS] Terminating dead connection");
+    const missed = (missedPongs.get(ws) ?? 0) + 1;
+    if (missed >= 2) {
+      console.log(`[SERVER] ${new Date().toISOString()} Terminating dead connection (${missed} missed pongs)`);
       ws.terminate();
       return;
     }
-    aliveSockets.set(ws, false);
+    missedPongs.set(ws, missed);
     ws.ping();
   });
 }, PING_INTERVAL_MS);
@@ -440,7 +441,7 @@ function handleClientMessage(
       if (!reconnResult.success) {
         ws.send(
           serverMsg(ServerMessageType.Error, {
-            code: "RECONNECT_FAILED",
+            code: reconnResult.errorCode || "RECONNECT_FAILED",
             message: reconnResult.error,
           })
         );
