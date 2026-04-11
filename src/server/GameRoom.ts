@@ -235,6 +235,7 @@ export class GameRoom {
         playerId,
         playerName: player.name,
         temporary: this.status === RoomStatus.Playing,
+        graceSeconds: this.status === RoomStatus.Playing ? Math.round(RECONNECT_GRACE_MS / 1000) : 0,
       })
     );
 

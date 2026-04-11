@@ -96,18 +96,23 @@ export class RoomManager {
     playerId: string,
     sessionToken: string,
     ws: WebSocket
-  ): { success: boolean; error?: string } {
+  ): { success: boolean; error?: string; errorCode?: string } {
     const room = this.rooms.get(roomCode.toUpperCase());
-    if (!room) return { success: false, error: "Room not found" };
+    if (!room) {
+      return { success: false, error: "Room not found — it may have expired or the server restarted", errorCode: "ROOM_EXPIRED" };
+    }
 
     const player = room.getPlayerBySessionToken(sessionToken);
-    if (!player || player.id !== playerId) {
-      return { success: false, error: "Invalid session" };
+    if (!player) {
+      return { success: false, error: "Player not found in this room", errorCode: "PLAYER_NOT_IN_ROOM" };
+    }
+    if (player.id !== playerId) {
+      return { success: false, error: "Invalid session token", errorCode: "INVALID_SESSION" };
     }
 
     const reconnected = room.reconnectPlayer(playerId, ws);
     if (!reconnected) {
-      return { success: false, error: "Reconnection failed" };
+      return { success: false, error: "Reconnection failed", errorCode: "RECONNECT_FAILED" };
     }
 
     console.log(`[ROOM:${roomCode}] ${new Date().toISOString()} Player ${playerId} reconnected`);
